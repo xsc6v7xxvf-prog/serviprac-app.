@@ -184,18 +184,18 @@ function LoginScreen({ onLogin }) {
   return (
     <div style={{
       minHeight: "100vh", background: "#FFFFFF", position: "relative", overflow: "hidden",
-      display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
-      padding: "40px 20px", fontFamily: FONT,
+      display: "flex", flexDirection: "column", alignItems: "flex-end", justifyContent: "center",
+      padding: "40px 24px", fontFamily: FONT,
     }}>
-      {/* Video de fondo: lancha SERVIPRAC Practicaje real, atenuado estilo marca de agua */}
+      {/* Video de fondo: lancha SERVIPRAC Practicaje real, más intenso — se ve la embarcación */}
       <video autoPlay muted loop playsInline style={{
         position: "absolute", inset: 0, width: "100%", height: "100%",
-        objectFit: "cover", opacity: 0.22, zIndex: 0,
+        objectFit: "cover", opacity: 0.62, zIndex: 0,
       }}>
         <source src="/practicaje.mp4" type="video/mp4" />
       </video>
       <div aria-hidden="true" style={{
-        position: "absolute", inset: 0, background: "rgba(255,255,255,0.72)", zIndex: 1,
+        position: "absolute", inset: 0, background: "rgba(255,255,255,0.28)", zIndex: 1,
       }} />
 
       <div style={{ width: "100%", maxWidth: 388, position: "relative", zIndex: 2 }}>
@@ -205,10 +205,14 @@ function LoginScreen({ onLogin }) {
           <img src={SERVIPRAC_WATERMARK} alt="SERVIPRAC S.A." style={{
             width: "min(78vw, 300px)", height: "auto", objectFit: "contain",
             margin: "0 auto", display: "block",
+            filter: "drop-shadow(0 2px 10px rgba(0,0,0,0.25))",
           }} />
         </div>
 
-        <div style={{ textAlign: "center", marginBottom: 32 }}>
+        <div style={{
+          textAlign: "center", marginBottom: 32, background: "rgba(255,255,255,0.82)",
+          borderRadius: 12, padding: "8px 14px", backdropFilter: "blur(2px)",
+        }}>
           <div style={{ color: C.navy, fontSize: 13, fontWeight: 700, letterSpacing: 0.2 }}>
             Sistema de Gestión de Personal Embarcado
           </div>
@@ -294,7 +298,10 @@ function LoginScreen({ onLogin }) {
         </div>
 
         {/* Disclaimer de seguridad */}
-        <div style={{ marginTop: 18, display: "flex", gap: 8, padding: "0 4px" }}>
+        <div style={{
+          marginTop: 18, display: "flex", gap: 8, padding: "10px 12px",
+          background: "rgba(255,255,255,0.82)", borderRadius: 10, backdropFilter: "blur(2px)",
+        }}>
           <ShieldAlert size={14} color={C.inkSoft} style={{ flexShrink: 0, marginTop: 1 }} />
           <div style={{ fontSize: 10.5, color: C.inkSoft, lineHeight: 1.45 }}>
             Las contraseñas nunca se guardan en el código ni en este navegador. Los usuarios se
