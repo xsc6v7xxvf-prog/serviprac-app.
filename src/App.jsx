@@ -286,8 +286,8 @@ function LoginScreen({ onLogin }) {
         <div style={{ marginTop: 18, display: "flex", gap: 8, padding: "0 4px" }}>
           <ShieldAlert size={14} color={C.inkSoft} style={{ flexShrink: 0, marginTop: 1 }} />
           <div style={{ fontSize: 10.5, color: C.inkSoft, lineHeight: 1.45 }}>
-            Autenticación real con Supabase Auth. Las contraseñas nunca se guardan en el código ni en
-            este navegador. Los usuarios se administran desde el panel de Supabase (Presidencia).
+            Las contraseñas nunca se guardan en el código ni en este navegador. Los usuarios se
+            administran desde Presidencia.
           </div>
         </div>
       </div>
