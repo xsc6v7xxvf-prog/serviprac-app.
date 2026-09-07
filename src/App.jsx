@@ -148,12 +148,14 @@ function empName(empleados, id) {
 /* ─────────────────────────── TOP BAR / TABS ─────────────────────────── */
 
 /* ─────────────────────────── LOGIN (Supabase Auth real) ─────────────────────────── */
+/* ─────────────────────────── LOGIN (Supabase Auth real) ─────────────────────────── */
 function LoginScreen({ onLogin }) {
   const [usuario, setUsuario] = useState("");
   const [password, setPassword] = useState("");
   const [showPw, setShowPw] = useState(false);
   const [error, setError] = useState("");
   const [checking, setChecking] = useState(false);
+  const [focusField, setFocusField] = useState(null);
 
   async function submit() {
     if (!usuario.trim() || !password || checking) return;
@@ -165,60 +167,162 @@ function LoginScreen({ onLogin }) {
     else onLogin(res.user);
   }
 
+  const loginInputStyle = (field) => ({
+    width: "100%",
+    padding: "13px 14px 13px 42px",
+    borderRadius: 10,
+    border: `1.5px solid ${focusField === field ? C.gold : "#E4E9F2"}`,
+    fontSize: 14.5,
+    fontFamily: FONT,
+    color: C.ink,
+    background: "#FAFBFD",
+    boxSizing: "border-box",
+    outline: "none",
+    transition: "border-color 0.15s ease",
+  });
+
   return (
     <div style={{
-      minHeight: "100vh", background: `linear-gradient(160deg, ${C.navyDark} 0%, ${C.navy} 60%)`,
+      minHeight: "100vh", position: "relative", overflow: "hidden",
+      background: `radial-gradient(1200px 800px at 50% -10%, #0A3A7A 0%, ${C.navyDark} 55%, #000B1A 100%)`,
       display: "flex", alignItems: "center", justifyContent: "center", padding: 20, fontFamily: FONT,
-      position: "relative", overflow: "hidden",
     }}>
+      {/* Patrón náutico de fondo: olas sutiles */}
+      <svg aria-hidden="true" style={{ position: "absolute", bottom: 0, left: 0, width: "100%", height: "38%", opacity: 0.5 }}
+        viewBox="0 0 1440 320" preserveAspectRatio="none">
+        <path fill="#0A3A7A" fillOpacity="0.55"
+          d="M0,224 C240,280 480,160 720,192 C960,224 1200,304 1440,256 L1440,320 L0,320 Z" />
+        <path fill="#0A3A7A" fillOpacity="0.35"
+          d="M0,272 C240,232 480,320 720,288 C960,256 1200,208 1440,240 L1440,320 L0,320 Z" />
+      </svg>
+
+      {/* Marca de agua SERVIPRAC */}
       <div aria-hidden="true" style={{
         position: "absolute", inset: 0, backgroundImage: `url(${SERVIPRAC_WATERMARK})`,
-        backgroundRepeat: "no-repeat", backgroundPosition: "center", backgroundSize: "min(140vw, 900px)",
-        opacity: 0.9, pointerEvents: "none",
+        backgroundRepeat: "no-repeat", backgroundPosition: "center 42%", backgroundSize: "min(130vw, 820px)",
+        opacity: 0.85, pointerEvents: "none",
       }} />
 
-      <div style={{ width: "100%", maxWidth: 380, position: "relative" }}>
-        <div style={{ textAlign: "center", marginBottom: 28 }}>
+      {/* Franja dorada superior, referencia institucional */}
+      <div aria-hidden="true" style={{ position: "absolute", top: 0, left: 0, right: 0, height: 4, background: `linear-gradient(90deg, transparent, ${C.gold}, transparent)` }} />
+
+      <div style={{ width: "100%", maxWidth: 388, position: "relative" }}>
+        {/* Isotipo con anillo dorado tipo sello institucional */}
+        <div style={{ textAlign: "center", marginBottom: 26 }}>
           <div style={{
-            width: 74, height: 74, borderRadius: 18, background: "#fff", margin: "0 auto 14px",
+            width: 92, height: 92, borderRadius: "50%", margin: "0 auto 16px",
+            background: `conic-gradient(from 180deg, ${C.gold}, #F3D27A, ${C.gold})`,
             display: "flex", alignItems: "center", justifyContent: "center",
-            boxShadow: "0 8px 24px rgba(0,0,0,0.25)", padding: 8,
+            boxShadow: "0 10px 32px rgba(0,0,0,0.4)", padding: 3,
           }}>
-            <img src={SERVIPRAC_LOGO} alt="Logo SERVIPRAC S.A." style={{ width: "100%", height: "100%", objectFit: "contain" }} />
-          </div>
-          <div style={{ color: "#fff", fontSize: 20, fontWeight: 800, letterSpacing: 0.2 }}>SERVIPRAC S.A.</div>
-          <div style={{ color: C.celeste, fontSize: 12.5, marginTop: 4, fontWeight: 600 }}>
-            Sistema de Gestión de Personal Embarcado · REGINAVE
-          </div>
-        </div>
-
-        <div style={{ background: "#fff", borderRadius: 16, padding: 20 }}>
-          <div style={{ fontSize: 12.5, fontWeight: 700, color: C.inkSoft, marginBottom: 12 }}>
-            INICIAR SESIÓN
-          </div>
-          <div style={{ marginBottom: 12 }}>
-            <Field label="Usuario" value={usuario} onChange={setUsuario} />
-          </div>
-          <div style={{ marginBottom: 6, position: "relative" }}>
-            <Field label="Contraseña" type={showPw ? "text" : "password"} value={password}
-              onChange={(v) => { setPassword(v); if (error) setError(""); }} />
-            <button onClick={() => setShowPw(!showPw)} style={{
-              position: "absolute", right: 10, top: 27, background: "transparent", border: "none", cursor: "pointer", color: C.inkSoft,
+            <div style={{
+              width: "100%", height: "100%", borderRadius: "50%", background: "#fff",
+              display: "flex", alignItems: "center", justifyContent: "center", padding: 12,
             }}>
-              {showPw ? <EyeOff size={16} /> : <Eye size={16} />}
-            </button>
+              <img src={SERVIPRAC_LOGO} alt="Logo SERVIPRAC S.A." style={{ width: "100%", height: "100%", objectFit: "contain" }} />
+            </div>
           </div>
-          {error && <div style={{ color: C.red, fontSize: 12, fontWeight: 700, margin: "6px 0 4px" }}>{error}</div>}
-          <div style={{ marginTop: 14 }}>
-            <Btn tone="primary" icon={Lock} disabled={checking || !usuario || !password} onClick={submit} full>
-              {checking ? "Verificando…" : "Ingresar"}
-            </Btn>
+          <div style={{
+            color: "#fff", fontSize: 22, fontWeight: 800, letterSpacing: 2.5,
+            textTransform: "uppercase", fontFamily: FONT,
+          }}>SERVIPRAC S.A.</div>
+          <div style={{
+            width: 44, height: 2, background: C.gold, margin: "10px auto 10px", borderRadius: 2,
+          }} />
+          <div style={{ color: C.celeste, fontSize: 12, fontWeight: 600, letterSpacing: 0.3 }}>
+            Sistema de Gestión de Personal Embarcado
+          </div>
+          <div style={{ color: "rgba(117,170,219,0.65)", fontSize: 10.5, fontWeight: 700, letterSpacing: 1.5, marginTop: 3 }}>
+            REGINAVE · PREFECTURA NAVAL ARGENTINA
           </div>
         </div>
 
-        <div style={{ marginTop: 14, padding: "10px 12px", background: "rgba(255,255,255,0.08)", borderRadius: 10, display: "flex", gap: 8 }}>
-          <ShieldAlert size={14} color={C.celeste} style={{ flexShrink: 0, marginTop: 1 }} />
-          <div style={{ fontSize: 10.5, color: C.celeste, lineHeight: 1.4 }}>
+        {/* Tarjeta de acceso */}
+        <div style={{
+          background: "#fff", borderRadius: 18, overflow: "hidden",
+          boxShadow: "0 24px 60px rgba(0,10,30,0.45)",
+        }}>
+          <div style={{ height: 5, background: `linear-gradient(90deg, ${C.navy}, ${C.gold})` }} />
+          <div style={{ padding: "26px 24px 24px" }}>
+            <div style={{ fontSize: 11.5, fontWeight: 800, color: C.navy, letterSpacing: 1.2, marginBottom: 18, textAlign: "center" }}>
+              INICIAR SESIÓN
+            </div>
+
+            <div style={{ marginBottom: 14 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: C.inkSoft, marginBottom: 5, letterSpacing: 0.2 }}>USUARIO</div>
+              <div style={{ position: "relative" }}>
+                <Users size={16} color={focusField === "usuario" ? C.gold : "#A6B0C3"} style={{ position: "absolute", left: 14, top: 14 }} />
+                <input
+                  value={usuario}
+                  onChange={(e) => setUsuario(e.target.value)}
+                  onFocus={() => setFocusField("usuario")}
+                  onBlur={() => setFocusField(null)}
+                  onKeyDown={(e) => e.key === "Enter" && submit()}
+                  style={loginInputStyle("usuario")}
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                />
+              </div>
+            </div>
+
+            <div style={{ marginBottom: 6 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: C.inkSoft, marginBottom: 5, letterSpacing: 0.2 }}>CONTRASEÑA</div>
+              <div style={{ position: "relative" }}>
+                <Lock size={16} color={focusField === "password" ? C.gold : "#A6B0C3"} style={{ position: "absolute", left: 14, top: 14 }} />
+                <input
+                  type={showPw ? "text" : "password"}
+                  value={password}
+                  onChange={(e) => { setPassword(e.target.value); if (error) setError(""); }}
+                  onFocus={() => setFocusField("password")}
+                  onBlur={() => setFocusField(null)}
+                  onKeyDown={(e) => e.key === "Enter" && submit()}
+                  style={{ ...loginInputStyle("password"), paddingRight: 42 }}
+                />
+                <button onClick={() => setShowPw(!showPw)} style={{
+                  position: "absolute", right: 10, top: 10, background: "transparent", border: "none",
+                  cursor: "pointer", color: "#A6B0C3", padding: 4,
+                }}>
+                  {showPw ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
+            </div>
+
+            {error && (
+              <div style={{
+                color: C.red, fontSize: 12, fontWeight: 700, margin: "10px 0 2px",
+                background: C.redLight, padding: "8px 10px", borderRadius: 8,
+              }}>{error}</div>
+            )}
+
+            <div style={{ marginTop: 18 }}>
+              <button
+                onClick={submit}
+                disabled={checking || !usuario || !password}
+                style={{
+                  width: "100%", padding: "13px 16px", borderRadius: 10, border: "none",
+                  background: checking || !usuario || !password
+                    ? "#B9C2D1"
+                    : `linear-gradient(135deg, ${C.navy}, #001B4D)`,
+                  color: "#fff", fontWeight: 800, fontSize: 14.5, letterSpacing: 0.3,
+                  cursor: checking || !usuario || !password ? "not-allowed" : "pointer",
+                  display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                  boxShadow: checking || !usuario || !password ? "none" : "0 8px 20px rgba(0,40,104,0.35)",
+                }}
+              >
+                <Lock size={15} />
+                {checking ? "Verificando…" : "Ingresar"}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Disclaimer de seguridad */}
+        <div style={{
+          marginTop: 16, padding: "11px 13px", background: "rgba(255,255,255,0.07)",
+          border: "1px solid rgba(255,255,255,0.12)", borderRadius: 12, display: "flex", gap: 9,
+        }}>
+          <ShieldAlert size={14} color={C.gold} style={{ flexShrink: 0, marginTop: 1 }} />
+          <div style={{ fontSize: 10.5, color: "rgba(235,245,255,0.85)", lineHeight: 1.45 }}>
             Autenticación real con Supabase Auth. Las contraseñas nunca se guardan en el código ni en
             este navegador. Los usuarios se administran desde el panel de Supabase (Presidencia).
           </div>
@@ -230,6 +334,7 @@ function LoginScreen({ onLogin }) {
 
 /* ─────────────────────────── APP (conectada a Supabase) ─────────────────────────── */
 export default function App() {
+
   const [currentUser, setCurrentUser] = useState(null);
   const [checkingSession, setCheckingSession] = useState(true);
   const role = currentUser?.rol || null;
