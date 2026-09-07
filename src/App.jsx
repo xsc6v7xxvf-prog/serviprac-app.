@@ -183,11 +183,22 @@ function LoginScreen({ onLogin }) {
 
   return (
     <div style={{
-      minHeight: "100vh", background: "#FFFFFF",
+      minHeight: "100vh", background: "#FFFFFF", position: "relative", overflow: "hidden",
       display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
       padding: "40px 20px", fontFamily: FONT,
     }}>
-      <div style={{ width: "100%", maxWidth: 388 }}>
+      {/* Video de fondo: lancha SERVIPRAC Practicaje real, atenuado estilo marca de agua */}
+      <video autoPlay muted loop playsInline style={{
+        position: "absolute", inset: 0, width: "100%", height: "100%",
+        objectFit: "cover", opacity: 0.22, zIndex: 0,
+      }}>
+        <source src="/practicaje.mp4" type="video/mp4" />
+      </video>
+      <div aria-hidden="true" style={{
+        position: "absolute", inset: 0, background: "rgba(255,255,255,0.72)", zIndex: 1,
+      }} />
+
+      <div style={{ width: "100%", maxWidth: 388, position: "relative", zIndex: 2 }}>
 
         {/* Zona superior: marca de agua como elemento propio, no de fondo */}
         <div style={{ textAlign: "center", marginBottom: 8 }}>
