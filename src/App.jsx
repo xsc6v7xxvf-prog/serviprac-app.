@@ -171,7 +171,7 @@ function LoginScreen({ onLogin }) {
     width: "100%",
     padding: "13px 14px 13px 42px",
     borderRadius: 10,
-    border: `1.5px solid ${focusField === field ? C.gold : "#E4E9F2"}`,
+    border: `1.5px solid ${focusField === field ? C.navy : "#E4E9F2"}`,
     fontSize: 14.5,
     fontFamily: FONT,
     color: C.ink,
@@ -183,64 +183,44 @@ function LoginScreen({ onLogin }) {
 
   return (
     <div style={{
-      minHeight: "100vh", position: "relative", overflow: "hidden",
-      background: "#FFFFFF",
-      display: "flex", alignItems: "center", justifyContent: "center", padding: 20, fontFamily: FONT,
+      minHeight: "100vh", background: "#FFFFFF",
+      display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+      padding: "40px 20px", fontFamily: FONT,
     }}>
-      {/* Marca de agua SERVIPRAC — grande, protagonista del fondo blanco */}
-      <div aria-hidden="true" style={{
-        position: "absolute", inset: 0, backgroundImage: `url(${SERVIPRAC_WATERMARK})`,
-        backgroundRepeat: "no-repeat", backgroundPosition: "center", backgroundSize: "min(160vw, 1100px)",
-        opacity: 0.9, pointerEvents: "none",
-      }} />
+      <div style={{ width: "100%", maxWidth: 388 }}>
 
-      <div style={{ width: "100%", maxWidth: 388, position: "relative" }}>
-        {/* Isotipo con anillo dorado tipo sello institucional */}
-        <div style={{ textAlign: "center", marginBottom: 26 }}>
-          <div style={{
-            width: 92, height: 92, borderRadius: "50%", margin: "0 auto 16px",
-            background: `conic-gradient(from 180deg, ${C.gold}, #F3D27A, ${C.gold})`,
-            display: "flex", alignItems: "center", justifyContent: "center",
-            boxShadow: "0 10px 28px rgba(0,40,104,0.18)", padding: 3,
-          }}>
-            <div style={{
-              width: "100%", height: "100%", borderRadius: "50%", background: "#fff",
-              display: "flex", alignItems: "center", justifyContent: "center", padding: 12,
-            }}>
-              <img src={SERVIPRAC_LOGO} alt="Logo SERVIPRAC S.A." style={{ width: "100%", height: "100%", objectFit: "contain" }} />
-            </div>
-          </div>
-          <div style={{
-            color: C.navy, fontSize: 22, fontWeight: 800, letterSpacing: 2.5,
-            textTransform: "uppercase", fontFamily: FONT,
-          }}>SERVIPRAC S.A.</div>
-          <div style={{
-            width: 44, height: 2, background: C.gold, margin: "10px auto 10px", borderRadius: 2,
+        {/* Zona superior: marca de agua como elemento propio, no de fondo */}
+        <div style={{ textAlign: "center", marginBottom: 8 }}>
+          <img src={SERVIPRAC_WATERMARK} alt="SERVIPRAC S.A." style={{
+            width: "min(78vw, 300px)", height: "auto", objectFit: "contain",
+            margin: "0 auto", display: "block",
           }} />
-          <div style={{ color: C.navy, fontSize: 12, fontWeight: 600, letterSpacing: 0.3 }}>
+        </div>
+
+        <div style={{ textAlign: "center", marginBottom: 32 }}>
+          <div style={{ color: C.navy, fontSize: 13, fontWeight: 700, letterSpacing: 0.2 }}>
             Sistema de Gestión de Personal Embarcado
           </div>
-          <div style={{ color: C.inkSoft, fontSize: 10.5, fontWeight: 700, letterSpacing: 1.5, marginTop: 3 }}>
+          <div style={{ color: C.inkSoft, fontSize: 10.5, fontWeight: 700, letterSpacing: 1.5, marginTop: 4 }}>
             REGINAVE · PREFECTURA NAVAL ARGENTINA
           </div>
         </div>
 
         {/* Tarjeta de acceso */}
         <div style={{
-          background: "#fff", borderRadius: 18, overflow: "hidden",
-          border: `1px solid ${C.border}`,
-          boxShadow: "0 24px 60px rgba(0,40,104,0.14)",
+          background: "#fff", borderRadius: 16, overflow: "hidden",
+          boxShadow: "0 1px 3px rgba(0,20,60,0.06), 0 16px 40px rgba(0,20,60,0.10)",
         }}>
-          <div style={{ height: 5, background: `linear-gradient(90deg, ${C.navy}, ${C.gold})` }} />
-          <div style={{ padding: "26px 24px 24px" }}>
-            <div style={{ fontSize: 11.5, fontWeight: 800, color: C.navy, letterSpacing: 1.2, marginBottom: 18, textAlign: "center" }}>
+          <div style={{ height: 3, background: C.gold }} />
+          <div style={{ padding: "28px 24px 24px" }}>
+            <div style={{ fontSize: 11.5, fontWeight: 800, color: C.navy, letterSpacing: 1.2, marginBottom: 20, textAlign: "center" }}>
               INICIAR SESIÓN
             </div>
 
             <div style={{ marginBottom: 14 }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: C.inkSoft, marginBottom: 5, letterSpacing: 0.2 }}>USUARIO</div>
               <div style={{ position: "relative" }}>
-                <Users size={16} color={focusField === "usuario" ? C.gold : "#A6B0C3"} style={{ position: "absolute", left: 14, top: 14 }} />
+                <Users size={16} color={focusField === "usuario" ? C.navy : "#A6B0C3"} style={{ position: "absolute", left: 14, top: 14 }} />
                 <input
                   value={usuario}
                   onChange={(e) => setUsuario(e.target.value)}
@@ -257,7 +237,7 @@ function LoginScreen({ onLogin }) {
             <div style={{ marginBottom: 6 }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: C.inkSoft, marginBottom: 5, letterSpacing: 0.2 }}>CONTRASEÑA</div>
               <div style={{ position: "relative" }}>
-                <Lock size={16} color={focusField === "password" ? C.gold : "#A6B0C3"} style={{ position: "absolute", left: 14, top: 14 }} />
+                <Lock size={16} color={focusField === "password" ? C.navy : "#A6B0C3"} style={{ position: "absolute", left: 14, top: 14 }} />
                 <input
                   type={showPw ? "text" : "password"}
                   value={password}
@@ -289,13 +269,10 @@ function LoginScreen({ onLogin }) {
                 disabled={checking || !usuario || !password}
                 style={{
                   width: "100%", padding: "13px 16px", borderRadius: 10, border: "none",
-                  background: checking || !usuario || !password
-                    ? "#B9C2D1"
-                    : `linear-gradient(135deg, ${C.navy}, #001B4D)`,
+                  background: checking || !usuario || !password ? "#B9C2D1" : C.navy,
                   color: "#fff", fontWeight: 800, fontSize: 14.5, letterSpacing: 0.3,
                   cursor: checking || !usuario || !password ? "not-allowed" : "pointer",
                   display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
-                  boxShadow: checking || !usuario || !password ? "none" : "0 8px 20px rgba(0,40,104,0.28)",
                 }}
               >
                 <Lock size={15} />
@@ -306,12 +283,9 @@ function LoginScreen({ onLogin }) {
         </div>
 
         {/* Disclaimer de seguridad */}
-        <div style={{
-          marginTop: 16, padding: "11px 13px", background: C.celesteLight,
-          border: `1px solid ${C.border}`, borderRadius: 12, display: "flex", gap: 9,
-        }}>
-          <ShieldAlert size={14} color={C.gold} style={{ flexShrink: 0, marginTop: 1 }} />
-          <div style={{ fontSize: 10.5, color: C.navy, lineHeight: 1.45 }}>
+        <div style={{ marginTop: 18, display: "flex", gap: 8, padding: "0 4px" }}>
+          <ShieldAlert size={14} color={C.inkSoft} style={{ flexShrink: 0, marginTop: 1 }} />
+          <div style={{ fontSize: 10.5, color: C.inkSoft, lineHeight: 1.45 }}>
             Autenticación real con Supabase Auth. Las contraseñas nunca se guardan en el código ni en
             este navegador. Los usuarios se administran desde el panel de Supabase (Presidencia).
           </div>
