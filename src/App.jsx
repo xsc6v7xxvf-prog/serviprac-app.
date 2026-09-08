@@ -566,23 +566,36 @@ function Dashboard({ empleados, sanciones, incidentes, evaluaciones, capacitacio
 function PersonalTab({ empleados, setEmpleados, canEdit, embarcaciones }) {
   const [q, setQ] = useState("");
   const [editing, setEditing] = useState(null);
+  const [adding, setAdding] = useState(false);
 
   const filtered = empleados.filter((e) =>
     `${e.apellido} ${e.nombre} ${e.dni}`.toLowerCase().includes(q.toLowerCase())
   );
+  const ordenados = [...filtered].sort((a, b) => {
+    if ((a.estado === "Baja") !== (b.estado === "Baja")) return a.estado === "Baja" ? 1 : -1;
+    return a.apellido.localeCompare(b.apellido);
+  });
 
   function save(form) {
     setEmpleados(empleados.map((e) => (e.id === form.id ? form : e)));
     setEditing(null);
   }
+  function add(form) {
+    setEmpleados([{ ...form, id: uid("EMP") }, ...empleados]);
+    setAdding(false);
+  }
+  function toggleBaja(emp) {
+    setEmpleados(empleados.map((e) => (e.id === emp.id ? { ...e, estado: e.estado === "Baja" ? "Activo" : "Baja" } : e)));
+  }
 
   return (
     <div>
-      <SectionTitle icon={Users} title="Personal" subtitle={`${empleados.length} trabajadores registrados`} />
+      <SectionTitle icon={Users} title="Personal" subtitle={`${empleados.length} trabajadores registrados`}
+        action={canEdit && <Btn tone="gold" icon={Plus} onClick={() => setAdding(true)}>Nuevo trabajador</Btn>} />
       <SearchBox q={q} setQ={setQ} placeholder="Buscar por apellido, nombre o DNI…" />
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-        {filtered.map((e) => (
-          <div key={e.id} style={{ background: C.card, borderRadius: 12, padding: 13, border: `1px solid ${C.border}`, display: "flex", alignItems: "center", gap: 10 }}>
+        {ordenados.map((e) => (
+          <div key={e.id} style={{ background: C.card, borderRadius: 12, padding: 13, border: `1px solid ${C.border}`, display: "flex", alignItems: "center", gap: 10, opacity: e.estado === "Baja" ? 0.55 : 1 }}>
             <div style={{ width: 38, height: 38, borderRadius: 10, background: C.celesteLight, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, fontWeight: 800, color: C.navy, fontSize: 13 }}>
               {e.apellido[0]}{e.nombre[0]}
             </div>
@@ -591,13 +604,25 @@ function PersonalTab({ empleados, setEmpleados, canEdit, embarcaciones }) {
               <div style={{ fontSize: 11.5, color: C.inkSoft }}>
                 DNI {e.dni} · {e.cargo || "Sin cargo asignado"} · Antig. {antiguedad(e.fIngreso)}a
               </div>
+              {e.estado === "Baja" && <div style={{ marginTop: 4 }}><Pill bg={C.redLight} fg={C.red}>Baja</Pill></div>}
             </div>
-            {canEdit && <IconBtn icon={Pencil} tone="primary" onClick={() => setEditing(e)} title="Editar" />}
+            {canEdit && (
+              <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                <IconBtn icon={Pencil} tone="primary" onClick={() => setEditing(e)} title="Editar" />
+                <IconBtn icon={e.estado === "Baja" ? CheckCircle2 : XCircle} tone={e.estado === "Baja" ? "primary" : "danger"}
+                  onClick={() => toggleBaja(e)} title={e.estado === "Baja" ? "Reactivar" : "Dar de baja"} />
+              </div>
+            )}
           </div>
         ))}
         {filtered.length === 0 && <EmptyState icon={Users} text="Sin resultados." />}
       </div>
 
+      {adding && (
+        <Modal title="Nuevo trabajador" onClose={() => setAdding(false)} wide>
+          <PersonalForm onCancel={() => setAdding(false)} onSave={add} embarcaciones={embarcaciones} />
+        </Modal>
+      )}
       {editing && (
         <Modal title={`${editing.apellido}, ${editing.nombre}`} onClose={() => setEditing(null)} wide>
           <PersonalForm emp={editing} onCancel={() => setEditing(null)} onSave={save} embarcaciones={embarcaciones} />
@@ -618,9 +643,14 @@ function SearchBox({ q, setQ, placeholder }) {
 }
 
 function PersonalForm({ emp, onCancel, onSave, embarcaciones }) {
-  const [f, setF] = useState(emp);
+  const [f, setF] = useState(emp || {
+    apellido: "", nombre: "", dni: "", cuil: "", fNacimiento: "", fIngreso: todayISO(),
+    cargo: "", categoriaReginave: "", libretaEmbarco: "", vencLibreta: "",
+    vencHabilitacion: "", vencCertMedico: "", lancha: "", distritoPNA: "", estado: "Activo",
+  });
   const set = (k) => (v) => setF({ ...f, [k]: v });
   const lanchaOpciones = (embarcaciones || []).filter((b) => b.estado === "Activa").map((b) => b.nombre);
+  const valid = f.apellido.trim().length > 0 && f.nombre.trim().length > 0;
   return (
     <div>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 14 }}>
@@ -639,7 +669,7 @@ function PersonalForm({ emp, onCancel, onSave, embarcaciones }) {
       </div>
       <div style={{ display: "flex", gap: 8 }}>
         <Btn tone="ghost" onClick={onCancel} full>Cancelar</Btn>
-        <Btn tone="primary" icon={Save} onClick={() => onSave(f)} full>Guardar</Btn>
+        <Btn tone="primary" icon={Save} disabled={!valid} onClick={() => onSave(f)} full>Guardar</Btn>
       </div>
     </div>
   );
@@ -821,7 +851,7 @@ function DotacionTab({ empleados, embarcaciones }) {
         <EmptyState icon={Anchor} text="No hay embarcaciones activas cargadas. Andá a la pestaña Embarcaciones." />
       )}
       {flotaActiva.map((b) => {
-        const list = empleados.filter((e) => e.lancha === b.nombre);
+        const list = empleados.filter((e) => e.lancha === b.nombre && e.estado !== "Baja");
         return (
         <div key={b.id} style={{ background: C.card, borderRadius: 12, padding: 13, border: `1px solid ${C.border}`, marginBottom: 8 }}>
           <div style={{ fontWeight: 700, fontSize: 13, color: C.navy, marginBottom: 6 }}>{b.nombre} · {list.length} tripulantes</div>
