@@ -135,9 +135,17 @@ function SectionTitle({ icon: Icon, title, subtitle, action }) {
 }
 
 function EmpPicker({ value, onChange, empleados }) {
+  const ordenados = [...empleados].sort((a, b) => a.apellido.localeCompare(b.apellido));
   return (
-    <Field label="Tripulante" value={value} onChange={onChange}
-      options={empleados.map((e) => e.id)} span={2} />
+    <label style={{ display: "block", gridColumn: "span 2" }}>
+      <div style={{ fontSize: 11.5, fontWeight: 700, color: C.inkSoft, marginBottom: 4 }}>Tripulante</div>
+      <select value={value} onChange={(e) => onChange(e.target.value)} style={inputStyle}>
+        <option value="">Seleccionar…</option>
+        {ordenados.map((e) => (
+          <option key={e.id} value={e.id}>{e.apellido}, {e.nombre}</option>
+        ))}
+      </select>
+    </label>
   );
 }
 function empName(empleados, id) {
