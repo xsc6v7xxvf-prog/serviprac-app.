@@ -338,12 +338,15 @@ export default function App() {
   const [incidentes, setIncidentes, r5] = useSupabaseTable("incidentes");
   const [evaluaciones, setEvaluaciones, r6] = useSupabaseTable("evaluaciones");
   const [nomina, setNomina, r7] = useSupabaseTable("nomina_salarial");
+  const [embarcaciones, setEmbarcaciones, r8] = useSupabaseTable("embarcaciones");
 
-  const ready = r1 && r2 && r3 && r4 && r5 && r6 && r7;
+  const ready = r1 && r2 && r3 && r4 && r5 && r6 && r7 && r8;
+  const isPresidente = role === "presidente";
 
   const TABS = useMemo(() => ([
     { id: "dashboard", label: "Dashboard", icon: TrendingUp },
     { id: "personal", label: "Personal", icon: Users },
+    { id: "embarcaciones", label: "Embarcaciones", icon: Ship },
     { id: "habilitaciones", label: "Habilitaciones", icon: BadgeCheck },
     { id: "medicos", label: "Cert. Médicos", icon: HeartPulse },
     { id: "capacitacion", label: "Capacitación", icon: GraduationCap },
@@ -381,7 +384,10 @@ export default function App() {
                 evaluaciones={evaluaciones} capacitaciones={capacitaciones} role={role} />
             )}
             {tab === "personal" && (
-              <PersonalTab empleados={empleados} setEmpleados={setEmpleados} canEdit={canEdit} />
+              <PersonalTab empleados={empleados} setEmpleados={setEmpleados} canEdit={canEdit} embarcaciones={embarcaciones} />
+            )}
+            {tab === "embarcaciones" && (
+              <EmbarcacionesTab items={embarcaciones} setItems={setEmbarcaciones} isPresidente={isPresidente} />
             )}
             {tab === "habilitaciones" && (
               <HabilitacionesTab empleados={empleados} setEmpleados={setEmpleados} canEdit={canEdit} />
@@ -392,9 +398,9 @@ export default function App() {
             {tab === "capacitacion" && (
               <CapacitacionTab empleados={empleados} items={capacitaciones} setItems={setCapacitaciones} canEdit={canEdit} />
             )}
-            {tab === "dotacion" && <DotacionTab empleados={empleados} />}
+            {tab === "dotacion" && <DotacionTab empleados={empleados} embarcaciones={embarcaciones} />}
             {tab === "embarcos" && (
-              <EmbarcosTab empleados={empleados} items={embarcos} setItems={setEmbarcos} canEdit={canEdit} />
+              <EmbarcosTab empleados={empleados} items={embarcos} setItems={setEmbarcos} canEdit={canEdit} embarcaciones={embarcaciones} />
             )}
             {tab === "reglamento" && <ReglamentoTab />}
             {tab === "sanciones" && (
@@ -549,7 +555,7 @@ function Dashboard({ empleados, sanciones, incidentes, evaluaciones, capacitacio
     </div>
   );
 }
-function PersonalTab({ empleados, setEmpleados, canEdit }) {
+function PersonalTab({ empleados, setEmpleados, canEdit, embarcaciones }) {
   const [q, setQ] = useState("");
   const [editing, setEditing] = useState(null);
 
@@ -586,7 +592,7 @@ function PersonalTab({ empleados, setEmpleados, canEdit }) {
 
       {editing && (
         <Modal title={`${editing.apellido}, ${editing.nombre}`} onClose={() => setEditing(null)} wide>
-          <PersonalForm emp={editing} onCancel={() => setEditing(null)} onSave={save} />
+          <PersonalForm emp={editing} onCancel={() => setEditing(null)} onSave={save} embarcaciones={embarcaciones} />
         </Modal>
       )}
     </div>
@@ -603,9 +609,10 @@ function SearchBox({ q, setQ, placeholder }) {
   );
 }
 
-function PersonalForm({ emp, onCancel, onSave }) {
+function PersonalForm({ emp, onCancel, onSave, embarcaciones }) {
   const [f, setF] = useState(emp);
   const set = (k) => (v) => setF({ ...f, [k]: v });
+  const lanchaOpciones = (embarcaciones || []).filter((b) => b.estado === "Activa").map((b) => b.nombre);
   return (
     <div>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 14 }}>
@@ -615,7 +622,7 @@ function PersonalForm({ emp, onCancel, onSave }) {
         <Field label="CUIL" value={f.cuil} onChange={set("cuil")} />
         <Field label="Cargo" value={f.cargo} onChange={set("cargo")} options={CARGOS} />
         <Field label="Categoría REGINAVE" value={f.categoriaReginave} onChange={set("categoriaReginave")} options={CATEGORIAS} />
-        <Field label="Lancha asignada" value={f.lancha} onChange={set("lancha")} options={["Cóndor I", "Cóndor II", "Reemplazo"]} />
+        <Field label="Lancha asignada" value={f.lancha} onChange={set("lancha")} options={lanchaOpciones} />
         <Field label="Distrito PNA" value={f.distritoPNA} onChange={set("distritoPNA")} />
         <Field label="Estado" value={f.estado} onChange={set("estado")} options={["Activo", "Licencia", "Suspendido", "Baja"]} />
         <div />
@@ -781,10 +788,9 @@ function CapForm({ empleados, onCancel, onSave }) {
   );
 }
 
-/* ─────────────────────────── DOTACIÓN TAB (referencia estática) ─────────────────────────── */
-function DotacionTab({ empleados }) {
-  const condorI = empleados.filter((e) => e.lancha === "Cóndor I");
-  const condorII = empleados.filter((e) => e.lancha === "Cóndor II");
+/* ─────────────────────────── DOTACIÓN TAB (referencia estática + flota real) ─────────────────────────── */
+function DotacionTab({ empleados, embarcaciones }) {
+  const flotaActiva = (embarcaciones || []).filter((b) => b.estado === "Activa");
   return (
     <div>
       <SectionTitle icon={Anchor} title="Dotación Mínima Segura" subtitle="Tabla normativa PNA / REGINAVE" />
@@ -803,9 +809,14 @@ function DotacionTab({ empleados }) {
       </div>
 
       <div style={{ fontSize: 13.5, fontWeight: 800, color: C.navy, marginBottom: 8 }}>Tripulación asignada actual</div>
-      {[["Cóndor I", condorI], ["Cóndor II", condorII]].map(([label, list]) => (
-        <div key={label} style={{ background: C.card, borderRadius: 12, padding: 13, border: `1px solid ${C.border}`, marginBottom: 8 }}>
-          <div style={{ fontWeight: 700, fontSize: 13, color: C.navy, marginBottom: 6 }}>{label} · {list.length} tripulantes</div>
+      {flotaActiva.length === 0 && (
+        <EmptyState icon={Anchor} text="No hay embarcaciones activas cargadas. Andá a la pestaña Embarcaciones." />
+      )}
+      {flotaActiva.map((b) => {
+        const list = empleados.filter((e) => e.lancha === b.nombre);
+        return (
+        <div key={b.id} style={{ background: C.card, borderRadius: 12, padding: 13, border: `1px solid ${C.border}`, marginBottom: 8 }}>
+          <div style={{ fontWeight: 700, fontSize: 13, color: C.navy, marginBottom: 6 }}>{b.nombre} · {list.length} tripulantes</div>
           {list.length === 0 ? (
             <div style={{ fontSize: 11.5, color: C.inkSoft }}>Sin asignaciones cargadas.</div>
           ) : list.map((e) => (
@@ -814,7 +825,8 @@ function DotacionTab({ empleados }) {
             </div>
           ))}
         </div>
-      ))}
+        );
+      })}
       <div style={{ marginTop: 4, padding: 12, background: C.yellowLight, borderRadius: 10, fontSize: 11.5, color: "#6B5A0A" }}>
         La lancha no puede zarpar por debajo de la dotación mínima reglamentaria (Punto 22 del Reglamento). Verificar cargo y categoría antes del servicio.
       </div>
@@ -823,7 +835,7 @@ function DotacionTab({ empleados }) {
 }
 
 /* ─────────────────────────── EMBARCOS TAB ─────────────────────────── */
-function EmbarcosTab({ empleados, items, setItems, canEdit }) {
+function EmbarcosTab({ empleados, items, setItems, canEdit, embarcaciones }) {
   const [adding, setAdding] = useState(false);
   function add(form) { setItems([{ ...form, id: uid("EMB") }, ...items]); setAdding(false); }
   function remove(id) { setItems(items.filter((i) => i.id !== id)); }
@@ -849,21 +861,22 @@ function EmbarcosTab({ empleados, items, setItems, canEdit }) {
       </div>
       {adding && (
         <Modal title="Nuevo embarco" onClose={() => setAdding(false)}>
-          <EmbarcoForm empleados={empleados} onCancel={() => setAdding(false)} onSave={add} />
+          <EmbarcoForm empleados={empleados} onCancel={() => setAdding(false)} onSave={add} embarcaciones={embarcaciones} />
         </Modal>
       )}
     </div>
   );
 }
-function EmbarcoForm({ empleados, onCancel, onSave }) {
+function EmbarcoForm({ empleados, onCancel, onSave, embarcaciones }) {
   const [f, setF] = useState({ empleadoId: "", lancha: "", fEmbarco: todayISO(), fDesembarco: "" });
   const set = (k) => (v) => setF({ ...f, [k]: v });
   const valid = f.empleadoId && f.lancha;
+  const lanchaOpciones = (embarcaciones || []).filter((b) => b.estado === "Activa").map((b) => b.nombre);
   return (
     <div>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 14 }}>
         <EmpPicker value={f.empleadoId} onChange={set("empleadoId")} empleados={empleados} />
-        <Field label="Lancha" value={f.lancha} onChange={set("lancha")} options={["Cóndor I", "Cóndor II"]} span={2} />
+        <Field label="Lancha" value={f.lancha} onChange={set("lancha")} options={lanchaOpciones} span={2} />
         <Field label="Fecha embarco" type="date" value={f.fEmbarco} onChange={set("fEmbarco")} />
         <Field label="Fecha desembarco" type="date" value={f.fDesembarco} onChange={set("fDesembarco")} />
       </div>
@@ -1317,6 +1330,125 @@ function NominaCCTTab({ empleados, items, setItems, canEdit }) {
             <Btn tone="primary" icon={Save} onClick={() => save(editing)} full>Guardar</Btn>
           </div>
         </Modal>
+      )}
+    </div>
+  );
+}
+/* ─────────────────────────── EMBARCACIONES (alta/baja solo Presidencia) ─────────────────────────── */
+const TIPOS_EMBARCACION = ["Lancha Motor", "Lancha de Prácticos", "Lancha de Prácticos - Amarre (No Simultáneo)", "Yate Motor"];
+const MATERIALES_CASCO = ["Acero", "Aluminio", "PRFV", "Plástico"];
+
+function EmbarcacionesTab({ items, setItems, isPresidente }) {
+  const [adding, setAdding] = useState(false);
+  const [editing, setEditing] = useState(null);
+
+  function add(form) {
+    setItems([{ ...form, id: uid("EMB-B"), estado: "Activa" }, ...items]);
+    setAdding(false);
+  }
+  function save(form) {
+    setItems(items.map((i) => (i.id === form.id ? form : i)));
+    setEditing(null);
+  }
+  function toggleEstado(item) {
+    setItems(items.map((i) => (i.id === item.id ? { ...i, estado: i.estado === "Activa" ? "Baja" : "Activa" } : i)));
+  }
+  function remove(id) {
+    setItems(items.filter((i) => i.id !== id));
+  }
+
+  const activas = items.filter((b) => b.estado === "Activa");
+  const bajas = items.filter((b) => b.estado !== "Activa");
+
+  return (
+    <div>
+      <SectionTitle icon={Ship} title="Embarcaciones" subtitle={`${activas.length} activas · ${bajas.length} de baja`}
+        action={isPresidente && <Btn tone="gold" icon={Plus} onClick={() => setAdding(true)}>Nueva embarcación</Btn>} />
+
+      {!isPresidente && (
+        <div style={{ background: C.celesteLight, color: C.navy, padding: 10, borderRadius: 10, fontSize: 11.5, marginBottom: 14, display: "flex", gap: 8 }}>
+          <Info size={14} style={{ flexShrink: 0, marginTop: 1 }} />
+          Solo Presidencia puede dar de alta, baja o editar embarcaciones.
+        </div>
+      )}
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        {[...activas, ...bajas].map((b) => (
+          <div key={b.id} style={{ background: C.card, borderRadius: 12, padding: 13, border: `1px solid ${C.border}`, opacity: b.estado === "Baja" ? 0.6 : 1 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontWeight: 700, fontSize: 13.5, color: C.navy }}>{b.nombre}</div>
+                <div style={{ fontSize: 11.5, color: C.inkSoft, marginTop: 2 }}>
+                  Matrícula {b.matricula || "—"} · {b.tipo || "—"}
+                </div>
+                <div style={{ fontSize: 11, color: C.inkSoft, marginTop: 2 }}>
+                  Eslora {b.eslora || "—"}m · {b.materialCasco || "—"} · {b.motores || "—"}
+                </div>
+                <div style={{ marginTop: 8 }}>
+                  <Pill bg={b.estado === "Activa" ? C.greenLight : C.redLight} fg={b.estado === "Activa" ? C.green : C.red}>
+                    {b.estado}
+                  </Pill>
+                </div>
+              </div>
+              {isPresidente && (
+                <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                  <IconBtn icon={Pencil} tone="primary" onClick={() => setEditing(b)} title="Editar" />
+                  <IconBtn icon={b.estado === "Activa" ? XCircle : CheckCircle2} tone={b.estado === "Activa" ? "danger" : "primary"}
+                    onClick={() => toggleEstado(b)} title={b.estado === "Activa" ? "Dar de baja" : "Reactivar"} />
+                </div>
+              )}
+            </div>
+          </div>
+        ))}
+        {items.length === 0 && <EmptyState icon={Ship} text="Sin embarcaciones cargadas." />}
+      </div>
+
+      {adding && (
+        <Modal title="Nueva embarcación" onClose={() => setAdding(false)} wide>
+          <EmbarcacionForm onCancel={() => setAdding(false)} onSave={add} />
+        </Modal>
+      )}
+      {editing && (
+        <Modal title={`Editar — ${editing.nombre}`} onClose={() => setEditing(null)} wide>
+          <EmbarcacionForm initial={editing} onCancel={() => setEditing(null)} onSave={save} onDelete={() => { remove(editing.id); setEditing(null); }} />
+        </Modal>
+      )}
+    </div>
+  );
+}
+
+function EmbarcacionForm({ initial, onCancel, onSave, onDelete }) {
+  const [f, setF] = useState(initial || {
+    nombre: "", matricula: "", materialCasco: "", tipo: "", explotacionEspecifica: "",
+    eslora: "", manga: "", puntal: "", tonelajeTotal: "", tonelajeNeto: "", motores: "", fechaInscripcion: "",
+  });
+  const set = (k) => (v) => setF({ ...f, [k]: v });
+  const valid = f.nombre.trim().length > 0;
+
+  return (
+    <div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 14 }}>
+        <Field label="Nombre" value={f.nombre} onChange={set("nombre")} span={2} />
+        <Field label="Matrícula (PNA)" value={f.matricula} onChange={set("matricula")} />
+        <Field label="Fecha de inscripción" type="date" value={f.fechaInscripcion} onChange={set("fechaInscripcion")} />
+        <Field label="Tipo" value={f.tipo} onChange={set("tipo")} options={TIPOS_EMBARCACION} />
+        <Field label="Material del casco" value={f.materialCasco} onChange={set("materialCasco")} options={MATERIALES_CASCO} />
+        <Field label="Explotación específica" value={f.explotacionEspecifica} onChange={set("explotacionEspecifica")} span={2} />
+        <Field label="Eslora (m)" type="number" value={f.eslora} onChange={set("eslora")} />
+        <Field label="Manga (m)" type="number" value={f.manga} onChange={set("manga")} />
+        <Field label="Puntal (m)" type="number" value={f.puntal} onChange={set("puntal")} />
+        <Field label="Tonelaje total" type="number" value={f.tonelajeTotal} onChange={set("tonelajeTotal")} />
+        <Field label="Tonelaje neto" type="number" value={f.tonelajeNeto} onChange={set("tonelajeNeto")} />
+        <Field label="Motores" value={f.motores} onChange={set("motores")} span={2} placeholder="Ej: 2x FPT Diesel 276.25 HP" />
+      </div>
+      <div style={{ display: "flex", gap: 8 }}>
+        <Btn tone="ghost" onClick={onCancel} full>Cancelar</Btn>
+        <Btn tone="primary" icon={Save} disabled={!valid} onClick={() => onSave(f)} full>Guardar</Btn>
+      </div>
+      {onDelete && (
+        <div style={{ marginTop: 10 }}>
+          <Btn tone="danger" icon={Trash2} onClick={onDelete} full>Eliminar definitivamente</Btn>
+        </div>
       )}
     </div>
   );

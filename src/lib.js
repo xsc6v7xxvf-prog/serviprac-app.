@@ -624,6 +624,26 @@ const mapNomina = {
   fromDb: (r) => ({ id: r.id, empleadoId: r.empleado_id, categoriaCCT: r.categoria_cct || "", salarioBasico: r.salario_basico || "" }),
   toDb: (e) => ({ empleado_id: e.empleadoId, categoria_cct: e.categoriaCCT || null, salario_basico: e.salarioBasico || null }),
 };
+const mapEmbarcacion = {
+  fromDb: (r) => ({
+    id: r.id, nombre: r.nombre, matricula: r.matricula || "",
+    materialCasco: r.material_casco || "", tipo: r.tipo || "",
+    explotacionEspecifica: r.explotacion_especifica || "",
+    eslora: r.eslora ?? "", manga: r.manga ?? "", puntal: r.puntal ?? "",
+    tonelajeTotal: r.tonelaje_total ?? "", tonelajeNeto: r.tonelaje_neto ?? "",
+    motores: r.motores || "", fechaInscripcion: r.fecha_inscripcion || "",
+    estado: r.estado || "Activa",
+  }),
+  toDb: (e) => ({
+    nombre: e.nombre, matricula: e.matricula || null,
+    material_casco: e.materialCasco || null, tipo: e.tipo || null,
+    explotacion_especifica: e.explotacionEspecifica || null,
+    eslora: e.eslora || null, manga: e.manga || null, puntal: e.puntal || null,
+    tonelaje_total: e.tonelajeTotal || null, tonelaje_neto: e.tonelajeNeto || null,
+    motores: e.motores || null, fecha_inscripcion: e.fechaInscripcion || null,
+    estado: e.estado || "Activa",
+  }),
+};
 
 export const TABLE_MAPS = {
   empleados: mapEmpleado,
@@ -633,6 +653,7 @@ export const TABLE_MAPS = {
   incidentes: mapIncidente,
   evaluaciones: mapEvaluacion,
   nomina_salarial: mapNomina,
+  embarcaciones: mapEmbarcacion,
 };
 
 /* ─────────────────────────── HOOK: tabla conectada a Supabase ─────────────────────────── */
