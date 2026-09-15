@@ -454,7 +454,7 @@ export const DOTACION_REF = [
   ["Lancha practicaje (CÓNDOR I/II)","~18m / ~30 TRB","1 Patrón de Puerto/Fluvial 2da","1 Motorista/Maquinista","1 Marinero Mercante"],
 ];
 
-export const CARGOS = ["Patrón de Puerto", "Patrón Fluvial 1ra", "Patrón Fluvial 2da", "Motorista Naval", "Maquinista Naval", "Marinero Mercante", "Administrativo"];
+export const CARGOS = ["Patrón Motorista Profesional de Primera", "Patrón Motorista Profesional de Segunda", "Patrón Motorista Profesional de Tercera", "Marinero con Máximo de Cargo", "Marinero de Puente", "Marinero Especial", "Marinero", "Auxiliar de Máquinas Navales", "Maestranza-Camarero", "Práctico", "Administrativo"];
 export const CATEGORIAS = ["Categoría A", "Categoría B", "Categoría C"];
 export const CURSOS_REGINAVE = ["Formación Básica de Seguridad (FBS)", "Lucha Contra Incendio", "Técnicas de Supervivencia",
   "Operador Radio Restringido (ORR)", "Primeros Auxilios a Bordo", "Manejo Seguro de Lanchas de Practicaje", "Prevención de Contaminación (MARPOL)"];
