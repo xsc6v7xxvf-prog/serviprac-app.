@@ -462,7 +462,8 @@ export const TIPOS_SANCION = ["Apercibimiento Verbal", "Apercibimiento Escrito",
 export const ROL_OPCIONES = [
   { value: "presidente", label: "Presidente / Directorio" },
   { value: "rrhh", label: "Recursos Humanos" },
-  { value: "patron", label: "Patrón / Consulta" },
+  { value: "director", label: "Director" },
+  { value: "vicepresidente", label: "Vicepresidente" },
 ];
 export function rolLabel(v) { return ROL_OPCIONES.find((r) => r.value === v)?.label || v; }
 
@@ -645,6 +646,30 @@ const mapEmbarcacion = {
   }),
 };
 
+const mapAuditoria = {
+  fromDb: (r) => ({
+    id: r.id, tabla: r.tabla, registroId: r.registro_id, accion: r.accion,
+    usuarioNombre: r.usuario_nombre || "Sistema",
+    datosAnteriores: r.datos_anteriores, datosNuevos: r.datos_nuevos,
+    creadoEn: r.creado_en,
+  }),
+  toDb: () => ({}), // solo lectura — nunca se escribe desde la app
+};
+const mapExamenSRT = {
+  fromDb: (r) => ({
+    id: r.id, empleadoId: r.empleado_id, tipo: r.tipo, fecha: r.fecha,
+    resultado: r.resultado || "", proximoVencimiento: r.proximo_vencimiento || "",
+    archivoPath: r.archivo_path || "", archivoNombre: r.archivo_nombre || "",
+    notas: r.notas || "",
+  }),
+  toDb: (e) => ({
+    empleado_id: e.empleadoId, tipo: e.tipo, fecha: e.fecha,
+    resultado: e.resultado || null, proximo_vencimiento: e.proximoVencimiento || null,
+    archivo_path: e.archivoPath || null, archivo_nombre: e.archivoNombre || null,
+    notas: e.notas || null,
+  }),
+};
+
 export const TABLE_MAPS = {
   empleados: mapEmpleado,
   capacitaciones: mapCapacitacion,
@@ -654,7 +679,34 @@ export const TABLE_MAPS = {
   evaluaciones: mapEvaluacion,
   nomina_salarial: mapNomina,
   embarcaciones: mapEmbarcacion,
+  auditoria: mapAuditoria,
+  examenes_srt: mapExamenSRT,
 };
+
+export const TIPOS_EXAMEN_SRT = ["Preocupacional", "Periódico", "Egreso"];
+export const RESULTADOS_EXAMEN_SRT = ["Apto", "Apto con Observaciones", "No Apto"];
+
+/* ─────────────────────────── ARCHIVOS: subida y descarga (Supabase Storage) ─────────────────────────── */
+export async function subirArchivoExamen(empleadoId, file) {
+  const ext = file.name.split(".").pop();
+  const path = `${empleadoId}/${uid("exm")}.${ext}`;
+  const { error } = await supabase.storage.from("examenes-srt").upload(path, file);
+  if (error) return { error: error.message };
+  return { path, nombre: file.name };
+}
+
+export async function descargarArchivoExamen(path) {
+  const { data, error } = await supabase.storage.from("examenes-srt").createSignedUrl(path, 60);
+  if (error) return { error: error.message };
+  return { url: data.signedUrl };
+}
+
+export async function borrarArchivoExamen(path) {
+  if (!path) return {};
+  const { error } = await supabase.storage.from("examenes-srt").remove([path]);
+  if (error) return { error: error.message };
+  return {};
+}
 
 /* ─────────────────────────── HOOK: tabla conectada a Supabase ─────────────────────────── */
 export function useSupabaseTable(tableName) {
