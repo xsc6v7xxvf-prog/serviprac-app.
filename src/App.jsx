@@ -10,9 +10,11 @@ import {
   C, FONT, SERVIPRAC_LOGO, SERVIPRAC_WATERMARK,
   REGLAMENTO_22, CRITERIOS, TOTAL_POND, VEREDICTOS_TABLA, NOTA_LEGAL_EVAL,
   DOTACION_REF, CARGOS, CATEGORIAS, CURSOS_REGINAVE, TIPOS_SANCION,
+  TIPOS_EXAMEN_SRT, RESULTADOS_EXAMEN_SRT,
   uid, todayISO, daysUntil, expiryTone, fmtDate, age, antiguedad,
   veredicto, groupByArea, useSupabaseTable,
   iniciarSesion, cerrarSesion, restaurarSesion,
+  subirArchivoExamen, descargarArchivoExamen, borrarArchivoExamen,
 } from "./lib.js";
 
 
@@ -164,15 +166,40 @@ function LoginScreen({ onLogin }) {
   const [error, setError] = useState("");
   const [checking, setChecking] = useState(false);
   const [focusField, setFocusField] = useState(null);
+  const [failedAttempts, setFailedAttempts] = useState(0);
+  const [lockedUntil, setLockedUntil] = useState(null);
+  const [now, setNow] = useState(Date.now());
+
+  useEffect(() => {
+    if (!lockedUntil) return;
+    const id = setInterval(() => setNow(Date.now()), 500);
+    return () => clearInterval(id);
+  }, [lockedUntil]);
+
+  const isLocked = !!lockedUntil && now < lockedUntil;
+  const secondsLeft = isLocked ? Math.ceil((lockedUntil - now) / 1000) : 0;
 
   async function submit() {
-    if (!usuario.trim() || !password || checking) return;
+    if (!usuario.trim() || !password || checking || isLocked) return;
     setChecking(true);
     setError("");
     const res = await iniciarSesion(usuario, password);
     setChecking(false);
-    if (res.error) setError(res.error);
-    else onLogin(res.user);
+    if (res.error) {
+      const attempts = failedAttempts + 1;
+      setFailedAttempts(attempts);
+      if (attempts >= 3) {
+        const waitSec = Math.min(30 * Math.pow(2, attempts - 3), 300);
+        setLockedUntil(Date.now() + waitSec * 1000);
+        setError(`Demasiados intentos fallidos. Esperá ${waitSec} segundos antes de volver a intentar.`);
+      } else {
+        setError(res.error);
+      }
+    } else {
+      setFailedAttempts(0);
+      setLockedUntil(null);
+      onLogin(res.user);
+    }
   }
 
   const loginInputStyle = (field) => ({
@@ -249,7 +276,7 @@ function LoginScreen({ onLogin }) {
                   onChange={(e) => setUsuario(e.target.value)}
                   onFocus={() => setFocusField("usuario")}
                   onBlur={() => setFocusField(null)}
-                  onKeyDown={(e) => e.key === "Enter" && submit()}
+                  onKeyDown={(e) => e.key === "Enter" && !isLocked && submit()}
                   style={loginInputStyle("usuario")}
                   autoCapitalize="none"
                   autoCorrect="off"
@@ -267,7 +294,7 @@ function LoginScreen({ onLogin }) {
                   onChange={(e) => { setPassword(e.target.value); if (error) setError(""); }}
                   onFocus={() => setFocusField("password")}
                   onBlur={() => setFocusField(null)}
-                  onKeyDown={(e) => e.key === "Enter" && submit()}
+                  onKeyDown={(e) => e.key === "Enter" && !isLocked && submit()}
                   style={{ ...loginInputStyle("password"), paddingRight: 42 }}
                 />
                 <button onClick={() => setShowPw(!showPw)} style={{
@@ -289,17 +316,17 @@ function LoginScreen({ onLogin }) {
             <div style={{ marginTop: 18 }}>
               <button
                 onClick={submit}
-                disabled={checking || !usuario || !password}
+                disabled={checking || !usuario || !password || isLocked}
                 style={{
                   width: "100%", padding: "13px 16px", borderRadius: 10, border: "none",
-                  background: checking || !usuario || !password ? "#B9C2D1" : C.navy,
+                  background: checking || !usuario || !password || isLocked ? "#B9C2D1" : C.navy,
                   color: "#fff", fontWeight: 800, fontSize: 14.5, letterSpacing: 0.3,
-                  cursor: checking || !usuario || !password ? "not-allowed" : "pointer",
+                  cursor: checking || !usuario || !password || isLocked ? "not-allowed" : "pointer",
                   display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
                 }}
               >
                 <Lock size={15} />
-                {checking ? "Verificando…" : "Ingresar"}
+                {checking ? "Verificando…" : isLocked ? `Esperá ${secondsLeft}s` : "Ingresar"}
               </button>
             </div>
           </div>
@@ -347,26 +374,39 @@ export default function App() {
   const [evaluaciones, setEvaluaciones, r6] = useSupabaseTable("evaluaciones");
   const [nomina, setNomina, r7] = useSupabaseTable("nomina_salarial");
   const [embarcaciones, setEmbarcaciones, r8] = useSupabaseTable("embarcaciones");
+  const [auditoria, setAuditoria, r9] = useSupabaseTable("auditoria");
+  const [examenesSRT, setExamenesSRT, r10] = useSupabaseTable("examenes_srt");
 
   const ready = r1 && r2 && r3 && r4 && r5 && r6 && r7 && r8;
   const isPresidente = role === "presidente";
+  const accesoRestringido = role === "director" || role === "vicepresidente";
 
-  const TABS = useMemo(() => ([
-    { id: "dashboard", label: "Dashboard", icon: TrendingUp },
-    { id: "personal", label: "Personal", icon: Users },
-    { id: "embarcaciones", label: "Embarcaciones", icon: Ship },
-    { id: "habilitaciones", label: "Habilitaciones", icon: BadgeCheck },
-    { id: "medicos", label: "Cert. Médicos", icon: HeartPulse },
-    { id: "capacitacion", label: "Capacitación", icon: GraduationCap },
-    { id: "dotacion", label: "Dotación Mínima", icon: Anchor },
-    { id: "embarcos", label: "Embarcos", icon: Ship },
-    { id: "reglamento", label: "Reglamento 22 Pts.", icon: ScrollText },
-    { id: "sanciones", label: "Sanciones", icon: FileWarning },
-    { id: "incidentes", label: "Incidentes", icon: AlertTriangle },
-    { id: "evaluacion", label: "Evaluación", icon: ClipboardList },
-    { id: "historial", label: "Hist. Evaluaciones", icon: Clock },
-    ...(seesNomina ? [{ id: "nomina", label: "Nómina y CCT", icon: DollarSign }] : []),
-  ]), [seesNomina]);
+  const TABS = useMemo(() => {
+    if (accesoRestringido) {
+      return [
+        { id: "dashboard", label: "Dashboard", icon: TrendingUp },
+        { id: "sanciones", label: "Sanciones", icon: FileWarning },
+        { id: "incidentes", label: "Incidentes", icon: AlertTriangle },
+      ];
+    }
+    return [
+      { id: "dashboard", label: "Dashboard", icon: TrendingUp },
+      { id: "personal", label: "Personal", icon: Users },
+      { id: "embarcaciones", label: "Embarcaciones", icon: Ship },
+      { id: "habilitaciones", label: "Habilitaciones", icon: BadgeCheck },
+      { id: "medicos", label: "Cert. Médicos", icon: HeartPulse },
+      { id: "capacitacion", label: "Capacitación", icon: GraduationCap },
+      { id: "dotacion", label: "Dotación Mínima", icon: Anchor },
+      { id: "embarcos", label: "Embarcos", icon: Ship },
+      { id: "reglamento", label: "Reglamento 22 Pts.", icon: ScrollText },
+      { id: "sanciones", label: "Sanciones", icon: FileWarning },
+      { id: "incidentes", label: "Incidentes", icon: AlertTriangle },
+      { id: "evaluacion", label: "Evaluación", icon: ClipboardList },
+      { id: "historial", label: "Hist. Evaluaciones", icon: Clock },
+      ...(seesNomina ? [{ id: "nomina", label: "Nómina y CCT", icon: DollarSign }] : []),
+      ...(isPresidente ? [{ id: "auditoria", label: "Auditoría", icon: Shield }] : []),
+    ];
+  }, [seesNomina, isPresidente, accesoRestringido]);
 
   if (checkingSession) {
     return (
@@ -401,7 +441,8 @@ export default function App() {
               <HabilitacionesTab empleados={empleados} setEmpleados={setEmpleados} canEdit={canEdit} />
             )}
             {tab === "medicos" && (
-              <MedicosTab empleados={empleados} setEmpleados={setEmpleados} canEdit={canEdit} />
+              <MedicosTab empleados={empleados} setEmpleados={setEmpleados} canEdit={canEdit}
+                examenesSRT={examenesSRT} setExamenesSRT={setExamenesSRT} />
             )}
             {tab === "capacitacion" && (
               <CapacitacionTab empleados={empleados} items={capacitaciones} setItems={setCapacitaciones} canEdit={canEdit} />
@@ -424,6 +465,9 @@ export default function App() {
             {tab === "nomina" && seesNomina && (
               <NominaCCTTab empleados={empleados} items={nomina} setItems={setNomina} canEdit={canEdit} />
             )}
+            {tab === "auditoria" && isPresidente && (
+              <AuditoriaTab items={auditoria} empleados={empleados} />
+            )}
           </>
         )}
       </div>
@@ -435,7 +479,8 @@ export default function App() {
 const ROLE_META = {
   presidente: { label: "PRESIDENCIA", bg: C.gold, icon: Crown },
   rrhh: { label: "RRHH", bg: C.celeste, icon: Users },
-  patron: { label: "PATRÓN", bg: "#5B6472", icon: Anchor },
+  director: { label: "DIRECTOR", bg: "#5B6472", icon: Shield },
+  vicepresidente: { label: "VICEPRESIDENTE", bg: "#5B6472", icon: Shield },
 };
 
 function TopBar({ currentUser, onSwitch }) {
@@ -731,8 +776,9 @@ function HabForm({ emp, onCancel, onSave }) {
 }
 
 /* ─────────────────────────── MÉDICOS TAB ─────────────────────────── */
-function MedicosTab({ empleados, setEmpleados, canEdit }) {
+function MedicosTab({ empleados, setEmpleados, canEdit, examenesSRT, setExamenesSRT }) {
   const [editing, setEditing] = useState(null);
+  const [verSRT, setVerSRT] = useState(null);
   function save(form) {
     setEmpleados(empleados.map((e) => (e.id === form.id ? form : e)));
     setEditing(null);
@@ -743,15 +789,27 @@ function MedicosTab({ empleados, setEmpleados, canEdit }) {
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         {empleados.map((e) => {
           const t = expiryTone(e.vencCertMedico);
+          const cantSRT = examenesSRT.filter((x) => x.empleadoId === e.id).length;
           return (
-            <div key={e.id} style={{ background: C.card, borderRadius: 12, padding: 13, border: `1px solid ${C.border}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <div>
-                <div style={{ fontWeight: 700, fontSize: 13.5, color: C.navy }}>{e.apellido}, {e.nombre}</div>
-                <div style={{ fontSize: 11.5, color: C.inkSoft, marginTop: 2 }}>Vence: {fmtDate(e.vencCertMedico)}</div>
+            <div key={e.id} style={{ background: C.card, borderRadius: 12, padding: 13, border: `1px solid ${C.border}` }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: 13.5, color: C.navy }}>{e.apellido}, {e.nombre}</div>
+                  <div style={{ fontSize: 11.5, color: C.inkSoft, marginTop: 2 }}>Vence: {fmtDate(e.vencCertMedico)}</div>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <Pill bg={t.bg} fg={t.fg}>{t.label}</Pill>
+                  {canEdit && <IconBtn icon={Pencil} onClick={() => setEditing(e)} title="Editar" />}
+                </div>
               </div>
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <Pill bg={t.bg} fg={t.fg}>{t.label}</Pill>
-                {canEdit && <IconBtn icon={Pencil} onClick={() => setEditing(e)} title="Editar" />}
+              <div style={{ marginTop: 10, paddingTop: 10, borderTop: `1px solid ${C.border}` }}>
+                <button onClick={() => setVerSRT(e)} style={{
+                  background: "transparent", border: "none", color: C.navy, fontSize: 11.5, fontWeight: 700,
+                  cursor: "pointer", display: "flex", alignItems: "center", gap: 6, padding: 0,
+                }}>
+                  <ClipboardList size={14} />
+                  Exámenes Ley 24.557 / SRT ({cantSRT})
+                </button>
               </div>
             </div>
           );
@@ -769,9 +827,121 @@ function MedicosTab({ empleados, setEmpleados, canEdit }) {
           </div>
         </Modal>
       )}
+      {verSRT && (
+        <Modal title={`Exámenes SRT — ${verSRT.apellido}, ${verSRT.nombre}`} onClose={() => setVerSRT(null)} wide>
+          <ExamenesSRTPanel empleado={verSRT} items={examenesSRT.filter((x) => x.empleadoId === verSRT.id)}
+            setItems={setExamenesSRT} allItems={examenesSRT} canEdit={canEdit} />
+        </Modal>
+      )}
     </div>
   );
 }
+
+function ExamenesSRTPanel({ empleado, items, setItems, allItems, canEdit }) {
+  const [adding, setAdding] = useState(false);
+  const [descargando, setDescargando] = useState(null);
+  const [errorArchivo, setErrorArchivo] = useState("");
+
+  async function add(form, file) {
+    setErrorArchivo("");
+    let archivoPath = "", archivoNombre = "";
+    if (file) {
+      const res = await subirArchivoExamen(empleado.id, file);
+      if (res.error) { setErrorArchivo("No se pudo subir el archivo: " + res.error); return; }
+      archivoPath = res.path; archivoNombre = res.nombre;
+    }
+    const nuevo = { ...form, empleadoId: empleado.id, id: uid("SRT"), archivoPath, archivoNombre };
+    setItems([nuevo, ...allItems]);
+    setAdding(false);
+  }
+
+  async function remove(item) {
+    if (item.archivoPath) await borrarArchivoExamen(item.archivoPath);
+    setItems(allItems.filter((i) => i.id !== item.id));
+  }
+
+  async function descargar(item) {
+    if (!item.archivoPath) return;
+    setDescargando(item.id);
+    const res = await descargarArchivoExamen(item.archivoPath);
+    setDescargando(null);
+    if (res.error) { setErrorArchivo("No se pudo generar la descarga: " + res.error); return; }
+    window.open(res.url, "_blank");
+  }
+
+  return (
+    <div>
+      {canEdit && !adding && (
+        <Btn tone="gold" icon={Plus} onClick={() => setAdding(true)} full>Nuevo examen</Btn>
+      )}
+      {errorArchivo && (
+        <div style={{ color: C.red, fontSize: 12, background: C.redLight, padding: 8, borderRadius: 8, marginTop: 10 }}>{errorArchivo}</div>
+      )}
+      {adding && <ExamenSRTForm onCancel={() => setAdding(false)} onSave={add} />}
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 14 }}>
+        {items.map((it) => (
+          <div key={it.id} style={{ background: C.bg, borderRadius: 10, padding: 11, border: `1px solid ${C.border}` }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
+              <div>
+                <div style={{ display: "flex", gap: 6, marginBottom: 4 }}>
+                  <Pill bg={C.celesteLight} fg={C.navy}>{it.tipo}</Pill>
+                  {it.resultado && <Pill bg={it.resultado === "No Apto" ? C.redLight : C.greenLight} fg={it.resultado === "No Apto" ? C.red : C.green}>{it.resultado}</Pill>}
+                </div>
+                <div style={{ fontSize: 12, color: C.ink }}>Fecha: {fmtDate(it.fecha)}</div>
+                {it.proximoVencimiento && <div style={{ fontSize: 11.5, color: C.inkSoft }}>Próximo: {fmtDate(it.proximoVencimiento)}</div>}
+                {it.notas && <div style={{ fontSize: 11, color: C.inkSoft, marginTop: 2 }}>{it.notas}</div>}
+              </div>
+              <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                {it.archivoPath && (
+                  <IconBtn icon={Eye} tone="primary" onClick={() => descargar(it)}
+                    title={descargando === it.id ? "Generando enlace…" : `Descargar ${it.archivoNombre || "PDF"}`} />
+                )}
+                {canEdit && <IconBtn icon={Trash2} tone="danger" onClick={() => remove(it)} title="Eliminar" />}
+              </div>
+            </div>
+          </div>
+        ))}
+        {items.length === 0 && <EmptyState icon={ClipboardList} text="Sin exámenes cargados todavía." />}
+      </div>
+    </div>
+  );
+}
+
+function ExamenSRTForm({ onCancel, onSave }) {
+  const [f, setF] = useState({ tipo: "Periódico", fecha: todayISO(), resultado: "Apto", proximoVencimiento: "", notas: "" });
+  const [file, setFile] = useState(null);
+  const [guardando, setGuardando] = useState(false);
+  const set = (k) => (v) => setF({ ...f, [k]: v });
+
+  async function handleSave() {
+    setGuardando(true);
+    await onSave(f, file);
+    setGuardando(false);
+  }
+
+  return (
+    <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, padding: 13, marginTop: 12 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
+        <Field label="Tipo de examen" value={f.tipo} onChange={set("tipo")} options={TIPOS_EXAMEN_SRT} />
+        <Field label="Resultado" value={f.resultado} onChange={set("resultado")} options={RESULTADOS_EXAMEN_SRT} />
+        <Field label="Fecha" type="date" value={f.fecha} onChange={set("fecha")} />
+        <Field label="Próximo vencimiento" type="date" value={f.proximoVencimiento} onChange={set("proximoVencimiento")} />
+        <Field label="Notas (opcional)" value={f.notas} onChange={set("notas")} span={2} />
+      </div>
+      <div style={{ marginBottom: 12 }}>
+        <div style={{ fontSize: 11.5, fontWeight: 700, color: C.inkSoft, marginBottom: 5 }}>PDF del resultado (opcional)</div>
+        <input type="file" accept="application/pdf" onChange={(e) => setFile(e.target.files[0] || null)}
+          style={{ fontSize: 12.5, width: "100%" }} />
+      </div>
+      <div style={{ display: "flex", gap: 8 }}>
+        <Btn tone="ghost" onClick={onCancel} full>Cancelar</Btn>
+        <Btn tone="primary" icon={Save} disabled={guardando} onClick={handleSave} full>{guardando ? "Guardando…" : "Guardar"}</Btn>
+      </div>
+    </div>
+  );
+}
+
 function CapacitacionTab({ empleados, items, setItems, canEdit }) {
   const [adding, setAdding] = useState(false);
   function add(form) { setItems([{ ...form, id: uid("CAP") }, ...items]); setAdding(false); }
@@ -1488,6 +1658,108 @@ function EmbarcacionForm({ initial, onCancel, onSave, onDelete }) {
           <Btn tone="danger" icon={Trash2} onClick={onDelete} full>Eliminar definitivamente</Btn>
         </div>
       )}
+    </div>
+  );
+}
+
+/* ─────────────────────────── AUDITORÍA (solo lectura, solo Presidencia) ─────────────────────────── */
+const TABLA_LABEL = {
+  empleados: "Personal", capacitaciones: "Capacitación", embarcos: "Embarcos",
+  sanciones: "Sanciones", incidentes: "Incidentes", evaluaciones: "Evaluación",
+  nomina_salarial: "Nómina y CCT", embarcaciones: "Embarcaciones", perfiles: "Usuarios",
+};
+const ACCION_META = {
+  INSERT: { label: "Alta", bg: C.greenLight, fg: C.green },
+  UPDATE: { label: "Edición", bg: C.celesteLight, fg: C.navy },
+  DELETE: { label: "Baja", bg: C.redLight, fg: C.red },
+};
+
+function AuditoriaTab({ items, empleados }) {
+  const [filtroTabla, setFiltroTabla] = useState("");
+  const [verDetalle, setVerDetalle] = useState(null);
+
+  const tablas = [...new Set(items.map((i) => i.tabla))];
+  const filtrados = filtroTabla ? items.filter((i) => i.tabla === filtroTabla) : items;
+
+  function describir(item) {
+    // Intenta mostrar algo legible del registro afectado (ej. nombre del empleado)
+    const datos = item.datosNuevos || item.datosAnteriores;
+    if (!datos) return "";
+    if (datos.apellido) return `${datos.apellido}, ${datos.nombre || ""}`;
+    if (datos.nombre) return datos.nombre;
+    if (datos.empleado_id) {
+      const e = empleados.find((x) => x.id === datos.empleado_id);
+      return e ? `${e.apellido}, ${e.nombre}` : "";
+    }
+    return "";
+  }
+
+  return (
+    <div>
+      <SectionTitle icon={Shield} title="Auditoría" subtitle={`${items.length} eventos registrados`} />
+
+      <div style={{ background: C.celesteLight, color: C.navy, padding: 10, borderRadius: 10, fontSize: 11, marginBottom: 14, display: "flex", gap: 8 }}>
+        <Info size={14} style={{ flexShrink: 0, marginTop: 1 }} />
+        Este registro lo genera automáticamente la base de datos ante cualquier alta, edición o baja —
+        nadie puede editarlo ni borrarlo desde la aplicación, ni siquiera Presidencia.
+      </div>
+
+      <div style={{ marginBottom: 12 }}>
+        <select value={filtroTabla} onChange={(e) => setFiltroTabla(e.target.value)} style={inputStyle}>
+          <option value="">Todas las secciones</option>
+          {tablas.map((t) => <option key={t} value={t}>{TABLA_LABEL[t] || t}</option>)}
+        </select>
+      </div>
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        {filtrados.map((item) => {
+          const meta = ACCION_META[item.accion] || { label: item.accion, bg: C.border, fg: C.inkSoft };
+          const desc = describir(item);
+          return (
+            <div key={item.id} style={{ background: C.card, borderRadius: 12, padding: 13, border: `1px solid ${C.border}` }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: "flex", gap: 6, marginBottom: 6, flexWrap: "wrap" }}>
+                    <Pill bg={meta.bg} fg={meta.fg}>{meta.label}</Pill>
+                    <Pill bg={C.border} fg={C.inkSoft}>{TABLA_LABEL[item.tabla] || item.tabla}</Pill>
+                  </div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: C.navy }}>{item.usuarioNombre}</div>
+                  {desc && <div style={{ fontSize: 12, color: C.ink, marginTop: 1 }}>{desc}</div>}
+                  <div style={{ fontSize: 11, color: C.inkSoft, marginTop: 3 }}>
+                    {new Date(item.creadoEn).toLocaleString("es-AR")}
+                  </div>
+                </div>
+                <button onClick={() => setVerDetalle(verDetalle === item.id ? null : item.id)} style={{
+                  background: "transparent", border: "none", color: C.navy, fontSize: 11, fontWeight: 700, cursor: "pointer", flexShrink: 0,
+                }}>
+                  {verDetalle === item.id ? "Ocultar" : "Ver detalle"}
+                </button>
+              </div>
+              {verDetalle === item.id && (
+                <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 8 }}>
+                  {item.datosAnteriores && (
+                    <div>
+                      <div style={{ fontSize: 10.5, fontWeight: 700, color: C.red, marginBottom: 3 }}>ANTES</div>
+                      <pre style={{ fontSize: 10, background: C.redLight, padding: 8, borderRadius: 8, overflowX: "auto", margin: 0 }}>
+                        {JSON.stringify(item.datosAnteriores, null, 2)}
+                      </pre>
+                    </div>
+                  )}
+                  {item.datosNuevos && (
+                    <div>
+                      <div style={{ fontSize: 10.5, fontWeight: 700, color: C.green, marginBottom: 3 }}>DESPUÉS</div>
+                      <pre style={{ fontSize: 10, background: C.greenLight, padding: 8, borderRadius: 8, overflowX: "auto", margin: 0 }}>
+                        {JSON.stringify(item.datosNuevos, null, 2)}
+                      </pre>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })}
+        {filtrados.length === 0 && <EmptyState icon={Shield} text="Sin eventos registrados todavía." />}
+      </div>
     </div>
   );
 }
