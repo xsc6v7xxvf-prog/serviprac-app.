@@ -462,6 +462,7 @@ export const LEGAJO_VACIO = {
   domicilioCalle: "", domicilioPiso: "", codigoPostal: "", ciudad: "", provincia: "", pais: "Argentina",
   telefonoCelular: "", telefonoFijo: "", email: "", codigoEmpleado: "", area: "", tipoContrato: "",
   emergenciaNombre: "", emergenciaParentesco: "", emergenciaTelefono: "", declaracionFecha: "", declaracionCiudad: "",
+  obraSocial: "", obraSocialAfiliado: "", derivaPrepaga: false, prepaga: "", prepagaAfiliado: "",
 };
 export const BENEF_VACIO = () => ({ nombre: "", dni: "", parentesco: "", fechaNacimiento: "", telefono: "", porcentaje: "" });
 export const sumaPorcentajes = (bs) => bs.reduce((a, b) => a + (parseFloat(b.porcentaje) || 0), 0);
@@ -475,6 +476,7 @@ export function estadoLegajo(leg, bens) {
     ["Domicilio", !!(l.domicilioCalle && l.ciudad)],
     ["Teléfono celular", !!l.telefonoCelular],
     ["Estado civil", !!l.estadoCivil],
+    ["Cobertura médica", !!(l.obraSocial && l.obraSocialAfiliado)],
     ["Contacto de emergencia", !!(l.emergenciaNombre && l.emergenciaTelefono)],
     ["Beneficiarios (100%)", cargados.length > 0 && Math.abs(sumaPorcentajes(cargados) - 100) < 0.001],
     ["Declaración jurada", !!l.declaracionFecha],
@@ -731,6 +733,8 @@ const mapLegajo = {
     emergenciaNombre: r.emergencia_nombre || "", emergenciaParentesco: r.emergencia_parentesco || "",
     emergenciaTelefono: r.emergencia_telefono || "",
     declaracionFecha: r.declaracion_fecha || "", declaracionCiudad: r.declaracion_ciudad || "",
+    obraSocial: r.obra_social || "", obraSocialAfiliado: r.obra_social_afiliado || "",
+    derivaPrepaga: !!r.deriva_prepaga, prepaga: r.prepaga || "", prepagaAfiliado: r.prepaga_afiliado || "",
   }),
   toDb: (e) => ({
     empleado_id: e.empleadoId, genero: e.genero || null, nacionalidad: e.nacionalidad || null,
@@ -742,6 +746,10 @@ const mapLegajo = {
     emergencia_nombre: e.emergenciaNombre || null, emergencia_parentesco: e.emergenciaParentesco || null,
     emergencia_telefono: e.emergenciaTelefono || null,
     declaracion_fecha: e.declaracionFecha || null, declaracion_ciudad: e.declaracionCiudad || null,
+    obra_social: e.obraSocial || null, obra_social_afiliado: e.obraSocialAfiliado || null,
+    deriva_prepaga: !!e.derivaPrepaga,
+    prepaga: e.derivaPrepaga ? (e.prepaga || null) : null,
+    prepaga_afiliado: e.derivaPrepaga ? (e.prepagaAfiliado || null) : null,
   }),
 };
 const mapBeneficiario = {
