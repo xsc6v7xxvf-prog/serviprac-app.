@@ -809,6 +809,7 @@ function PersonalForm({ emp, legajo, benefs, familia, nomina, onCancel, onSave, 
     if (x.fechaNacimiento && x.fechaNacimiento > hoyISO) errores.push(`${n}: la fecha de nacimiento no puede ser futura.`);
     if (x.certificadoEscolarAnio && !/^\d{4}$/.test(x.certificadoEscolarAnio)) errores.push(`${n}: el año del certificado escolar debe tener 4 dígitos.`);
   });
+  if (l.derivaPrepaga && !(l.prepaga || "").trim()) errores.push("Cobertura médica: indicá a qué prepaga deriva los aportes.");
   function guardar() {
     if (errores.length) { setIntento(true); return; }
     onSave(f, l, bs, fams);
@@ -868,14 +869,29 @@ function PersonalForm({ emp, legajo, benefs, familia, nomina, onCancel, onSave, 
         </div>
       </div>
 
-      {seccion("4. Contacto de emergencia")}
+      {seccion("4. Cobertura médica")}
+      <div style={grid}>
+        <Field label="Obra social" value={l.obraSocial} onChange={setLeg("obraSocial")} placeholder="Nombre de la obra social" />
+        <Field label="N° de afiliado" value={l.obraSocialAfiliado} onChange={setLeg("obraSocialAfiliado")} />
+        <div style={{ gridColumn: "span 2" }}>
+          <Casilla label="Deriva sus aportes a una prepaga" checked={l.derivaPrepaga} onChange={setLeg("derivaPrepaga")} />
+        </div>
+        {l.derivaPrepaga && (
+          <>
+            <Field label="Prepaga" value={l.prepaga} onChange={setLeg("prepaga")} />
+            <Field label="N° de socio de la prepaga" value={l.prepagaAfiliado} onChange={setLeg("prepagaAfiliado")} />
+          </>
+        )}
+      </div>
+
+      {seccion("5. Contacto de emergencia")}
       <div style={grid}>
         <Field label="Nombre completo" value={l.emergenciaNombre} onChange={setLeg("emergenciaNombre")} />
         <Field label="Parentesco" value={l.emergenciaParentesco} onChange={setLeg("emergenciaParentesco")} />
         <Field label="Teléfono de contacto (24/7)" value={l.emergenciaTelefono} onChange={setLeg("emergenciaTelefono")} span={2} />
       </div>
 
-      {seccion("5. Grupo familiar")}
+      {seccion("6. Grupo familiar")}
       {nota("Cónyuge, concubino/a, hijos/as y otros familiares. Indicá si está a cargo del trabajador y si genera derecho a asignaciones familiares y a cobertura de obra social.")}
       {fams.map((x, i) => {
         const edad = x.fechaNacimiento ? age(x.fechaNacimiento) : null;
@@ -928,7 +944,7 @@ function PersonalForm({ emp, legajo, benefs, familia, nomina, onCancel, onSave, 
         <Btn tone="ghost" icon={Plus} onClick={() => setFams([...fams, FAMILIAR_VACIO()])} full>Agregar familiar</Btn>
       </div>
 
-      {seccion("6. Designación de beneficiarios (seguro de vida / fallecimiento)")}
+      {seccion("7. Designación de beneficiarios (seguro de vida / fallecimiento)")}
       {nota("En caso de fallecimiento del trabajador, las indemnizaciones, seguros de vida vigentes y/o haberes devengados pendientes se distribuirán entre las siguientes personas según los porcentajes indicados. La suma debe ser estrictamente 100%.")}
       {bs.map((b, i) => (
         <div key={i} style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 10, padding: 10, marginBottom: 10 }}>
@@ -951,7 +967,7 @@ function PersonalForm({ emp, legajo, benefs, familia, nomina, onCancel, onSave, 
         </div>
       )}
 
-      {seccion("7. Declaración jurada y firma")}
+      {seccion("8. Declaración jurada y firma")}
       {nota("Declaro bajo juramento que todos los datos asentados en este formulario son correctos, completos y fiel expresión de la verdad. Me comprometo a notificar formalmente a la empresa cualquier cambio que ocurra en la información aquí brindada en un plazo no mayor a 30 días.")}
       <div style={grid}>
         <Field label="Ciudad de firma" value={l.declaracionCiudad} onChange={setLeg("declaracionCiudad")} />
