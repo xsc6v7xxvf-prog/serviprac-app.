@@ -9,8 +9,9 @@ import {
 import {
   C, FONT, SERVIPRAC_LOGO, SERVIPRAC_WATERMARK,
   REGLAMENTO_22, CRITERIOS, TOTAL_POND, VEREDICTOS_TABLA, NOTA_LEGAL_EVAL,
-  DOTACION_REF, CARGOS, CATEGORIAS, CURSOS_REGINAVE, TIPOS_SANCION,
+  DOTACION_REF, CARGOS, ESTADOS_CIVILES, CURSOS_REGINAVE, TIPOS_SANCION,
   TIPOS_EXAMEN_SRT, RESULTADOS_EXAMEN_SRT,
+  GENEROS, TIPOS_CONTRATO, LEGAJO_VACIO, BENEF_VACIO, sumaPorcentajes, cbuValido, maskCBU, estadoLegajo,
   uid, todayISO, daysUntil, expiryTone, fmtDate, age, antiguedad,
   veredicto, groupByArea, useSupabaseTable,
   iniciarSesion, cerrarSesion, restaurarSesion,
@@ -376,6 +377,14 @@ export default function App() {
   const [embarcaciones, setEmbarcaciones, r8] = useSupabaseTable("embarcaciones");
   const [auditoria, setAuditoria, r9] = useSupabaseTable("auditoria");
   const [examenesSRT, setExamenesSRT, r10] = useSupabaseTable("examenes_srt");
+  const [legajos, setLegajos] = useSupabaseTable("legajos");
+  const [beneficiarios, setBeneficiarios] = useSupabaseTable("beneficiarios");
+  const [errorGuardado, setErrorGuardado] = useState(null);
+  useEffect(() => {
+    const h = (e) => setErrorGuardado(e.detail);
+    window.addEventListener("serviprac-error", h);
+    return () => window.removeEventListener("serviprac-error", h);
+  }, []);
 
   const ready = r1 && r2 && r3 && r4 && r5 && r6 && r7 && r8;
   const isPresidente = role === "presidente";
@@ -423,6 +432,16 @@ export default function App() {
       <TopBar currentUser={currentUser} onSwitch={async () => { await cerrarSesion(); setCurrentUser(null); }} />
       <TabBar tabs={TABS} active={tab} onChange={setTab} />
       <div style={{ maxWidth: 980, margin: "0 auto", padding: "16px 12px 60px" }}>
+        {errorGuardado && (
+          <div style={{ background: C.redLight, color: C.red, border: `1px solid ${C.red}`, padding: 10, borderRadius: 10, fontSize: 12.5, marginBottom: 12, display: "flex", gap: 8, alignItems: "flex-start" }}>
+            <AlertTriangle size={15} style={{ flexShrink: 0, marginTop: 1 }} />
+            <div style={{ flex: 1 }}>
+              <b>No se pudo {errorGuardado.accion} en «{errorGuardado.tabla}».</b> Los cambios no quedaron registrados en la base de datos.
+              <div style={{ fontSize: 11, marginTop: 3, opacity: 0.85 }}>{errorGuardado.mensaje}</div>
+            </div>
+            <button onClick={() => setErrorGuardado(null)} style={{ background: "transparent", border: "none", color: C.red, cursor: "pointer", fontWeight: 800 }}>✕</button>
+          </div>
+        )}
         {!ready ? (
           <div style={{ textAlign: "center", padding: 60, color: C.inkSoft }}>Cargando datos…</div>
         ) : (
@@ -432,7 +451,8 @@ export default function App() {
                 evaluaciones={evaluaciones} capacitaciones={capacitaciones} role={role} />
             )}
             {tab === "personal" && (
-              <PersonalTab empleados={empleados} setEmpleados={setEmpleados} canEdit={canEdit} embarcaciones={embarcaciones} />
+              <PersonalTab empleados={empleados} setEmpleados={setEmpleados} canEdit={canEdit} embarcaciones={embarcaciones}
+                legajos={legajos} setLegajos={setLegajos} beneficiarios={beneficiarios} setBeneficiarios={setBeneficiarios} nomina={nomina} />
             )}
             {tab === "embarcaciones" && (
               <EmbarcacionesTab items={embarcaciones} setItems={setEmbarcaciones} isPresidente={isPresidente} />
@@ -608,10 +628,14 @@ function Dashboard({ empleados, sanciones, incidentes, evaluaciones, capacitacio
     </div>
   );
 }
-function PersonalTab({ empleados, setEmpleados, canEdit, embarcaciones }) {
+function PersonalTab({ empleados, setEmpleados, canEdit, embarcaciones, legajos, setLegajos, beneficiarios, setBeneficiarios, nomina }) {
   const [q, setQ] = useState("");
   const [editing, setEditing] = useState(null);
   const [adding, setAdding] = useState(false);
+
+  const legPorEmp = Object.fromEntries(legajos.map((l) => [l.empleadoId, l]));
+  const nomPorEmp = Object.fromEntries(nomina.map((n) => [n.empleadoId, n]));
+  const benDe = (id) => beneficiarios.filter((b) => b.empleadoId === id).sort((a, b) => a.orden - b.orden);
 
   const filtered = empleados.filter((e) =>
     `${e.apellido} ${e.nombre} ${e.dni}`.toLowerCase().includes(q.toLowerCase())
@@ -621,13 +645,33 @@ function PersonalTab({ empleados, setEmpleados, canEdit, embarcaciones }) {
     return a.apellido.localeCompare(b.apellido);
   });
 
-  function save(form) {
-    setEmpleados(empleados.map((e) => (e.id === form.id ? form : e)));
-    setEditing(null);
+  async function guardarLegajo(empId, leg) {
+    const actual = legajos.find((l) => l.empleadoId === empId);
+    if (actual) await setLegajos(legajos.map((l) => (l.id === actual.id ? { ...actual, ...leg, id: actual.id, empleadoId: empId } : l)));
+    else await setLegajos([{ ...leg, id: uid("LEG"), empleadoId: empId }, ...legajos]);
   }
-  function add(form) {
-    setEmpleados([{ ...form, id: uid("EMP") }, ...empleados]);
+  async function guardarBenef(empId, filas) {
+    const previos = beneficiarios.filter((b) => b.empleadoId === empId);
+    const nuevos = filas.filter((f) => f.nombre.trim()).map((f, i) => {
+      const previo = previos.find((p) => p.orden === i + 1);
+      return { ...f, nombre: f.nombre.trim(), empleadoId: empId, orden: i + 1, id: previo ? previo.id : uid("BEN") };
+    });
+    await setBeneficiarios([...beneficiarios.filter((b) => b.empleadoId !== empId), ...nuevos]);
+  }
+
+  async function save(emp, leg, bens) {
+    setEditing(null);
+    setEmpleados(empleados.map((e) => (e.id === emp.id ? emp : e)));
+    await guardarLegajo(emp.id, leg);
+    await guardarBenef(emp.id, bens);
+  }
+  async function add(emp, leg, bens) {
     setAdding(false);
+    const insertados = await setEmpleados([{ ...emp, id: uid("EMP") }, ...empleados]);
+    const real = insertados && insertados[0];
+    if (!real) return;              // el aviso de error ya se mostró
+    await guardarLegajo(real.id, leg);
+    await guardarBenef(real.id, bens);
   }
   function toggleBaja(emp) {
     setEmpleados(empleados.map((e) => (e.id === emp.id ? { ...e, estado: e.estado === "Baja" ? "Activo" : "Baja" } : e)));
@@ -639,38 +683,50 @@ function PersonalTab({ empleados, setEmpleados, canEdit, embarcaciones }) {
         action={canEdit && <Btn tone="gold" icon={Plus} onClick={() => setAdding(true)}>Nuevo trabajador</Btn>} />
       <SearchBox q={q} setQ={setQ} placeholder="Buscar por apellido, nombre o DNI…" />
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-        {ordenados.map((e) => (
-          <div key={e.id} style={{ background: C.card, borderRadius: 12, padding: 13, border: `1px solid ${C.border}`, display: "flex", alignItems: "center", gap: 10, opacity: e.estado === "Baja" ? 0.55 : 1 }}>
-            <div style={{ width: 38, height: 38, borderRadius: 10, background: C.celesteLight, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, fontWeight: 800, color: C.navy, fontSize: 13 }}>
-              {e.apellido[0]}{e.nombre[0]}
-            </div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontWeight: 700, fontSize: 13.5, color: C.navy }}>{e.apellido}, {e.nombre}</div>
-              <div style={{ fontSize: 11.5, color: C.inkSoft }}>
-                DNI {e.dni} · {e.cargo || "Sin cargo asignado"} · Antig. {antiguedad(e.fIngreso)}a
+        {ordenados.map((e) => {
+          const est = estadoLegajo(legPorEmp[e.id], benDe(e.id));
+          const completo = est.hechos === est.total;
+          return (
+            <div key={e.id} style={{ background: C.card, borderRadius: 12, padding: 13, border: `1px solid ${C.border}`, display: "flex", alignItems: "center", gap: 10, opacity: e.estado === "Baja" ? 0.55 : 1 }}>
+              <div style={{ width: 38, height: 38, borderRadius: 10, background: C.celesteLight, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, fontWeight: 800, color: C.navy, fontSize: 13 }}>
+                {e.apellido[0]}{e.nombre[0]}
               </div>
-              {e.estado === "Baja" && <div style={{ marginTop: 4 }}><Pill bg={C.redLight} fg={C.red}>Baja</Pill></div>}
-            </div>
-            {canEdit && (
-              <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
-                <IconBtn icon={Pencil} tone="primary" onClick={() => setEditing(e)} title="Editar" />
-                <IconBtn icon={e.estado === "Baja" ? CheckCircle2 : XCircle} tone={e.estado === "Baja" ? "primary" : "danger"}
-                  onClick={() => toggleBaja(e)} title={e.estado === "Baja" ? "Reactivar" : "Dar de baja"} />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontWeight: 700, fontSize: 13.5, color: C.navy }}>{e.apellido}, {e.nombre}</div>
+                <div style={{ fontSize: 11.5, color: C.inkSoft }}>
+                  DNI {e.dni} · {e.cargo || "Sin cargo asignado"} · Antig. {antiguedad(e.fIngreso)}a
+                </div>
+                <div style={{ marginTop: 4, display: "flex", gap: 6, flexWrap: "wrap" }}>
+                  {e.estado === "Baja" && <Pill bg={C.redLight} fg={C.red}>Baja</Pill>}
+                  {canEdit && (
+                    <span title={completo ? "Legajo completo" : `Falta: ${est.faltan.join(", ")}`}>
+                      <Pill bg={completo ? C.greenLight : C.orangeLight} fg={completo ? C.green : C.orange}>Legajo {est.hechos}/{est.total}</Pill>
+                    </span>
+                  )}
+                </div>
               </div>
-            )}
-          </div>
-        ))}
+              {canEdit && (
+                <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                  <IconBtn icon={Pencil} tone="primary" onClick={() => setEditing(e)} title="Editar legajo" />
+                  <IconBtn icon={e.estado === "Baja" ? CheckCircle2 : XCircle} tone={e.estado === "Baja" ? "primary" : "danger"}
+                    onClick={() => toggleBaja(e)} title={e.estado === "Baja" ? "Reactivar" : "Dar de baja"} />
+                </div>
+              )}
+            </div>
+          );
+        })}
         {filtered.length === 0 && <EmptyState icon={Users} text="Sin resultados." />}
       </div>
 
       {adding && (
-        <Modal title="Nuevo trabajador" onClose={() => setAdding(false)} wide>
+        <Modal title="Nuevo trabajador — Legajo" onClose={() => setAdding(false)} wide>
           <PersonalForm onCancel={() => setAdding(false)} onSave={add} embarcaciones={embarcaciones} />
         </Modal>
       )}
       {editing && (
-        <Modal title={`${editing.apellido}, ${editing.nombre}`} onClose={() => setEditing(null)} wide>
-          <PersonalForm emp={editing} onCancel={() => setEditing(null)} onSave={save} embarcaciones={embarcaciones} />
+        <Modal title={`Legajo — ${editing.apellido}, ${editing.nombre}`} onClose={() => setEditing(null)} wide>
+          <PersonalForm emp={editing} legajo={legPorEmp[editing.id]} benefs={benDe(editing.id)} nomina={nomPorEmp[editing.id]}
+            onCancel={() => setEditing(null)} onSave={save} embarcaciones={embarcaciones} />
         </Modal>
       )}
     </div>
@@ -687,34 +743,138 @@ function SearchBox({ q, setQ, placeholder }) {
   );
 }
 
-function PersonalForm({ emp, onCancel, onSave, embarcaciones }) {
+function PersonalForm({ emp, legajo, benefs, nomina, onCancel, onSave, embarcaciones }) {
   const [f, setF] = useState(emp || {
     apellido: "", nombre: "", dni: "", cuil: "", fNacimiento: "", fIngreso: todayISO(),
-    cargo: "", categoriaReginave: "", libretaEmbarco: "", vencLibreta: "",
-    vencHabilitacion: "", vencCertMedico: "", lancha: "", distritoPNA: "", estado: "Activo",
+    cargo: "", lancha: "", estado: "Activo",
+    libretaEmbarco: "", vencLibreta: "", vencHabilitacion: "", vencCertMedico: "",
   });
+  const [l, setL] = useState({ ...LEGAJO_VACIO, ...(legajo || {}) });
+  const [bs, setBs] = useState(() => [0, 1, 2].map((i) => {
+    const b = (benefs || []).find((x) => x.orden === i + 1);
+    return b ? { ...b } : BENEF_VACIO();
+  }));
+  const [intento, setIntento] = useState(false);
   const set = (k) => (v) => setF({ ...f, [k]: v });
+  const setLeg = (k) => (v) => setL({ ...l, [k]: v });
+  const setBen = (i, k) => (v) => setBs(bs.map((b, j) => (j === i ? { ...b, [k]: v } : b)));
   const lanchaOpciones = (embarcaciones || []).filter((b) => b.estado === "Activa").map((b) => b.nombre);
-  const valid = f.apellido.trim().length > 0 && f.nombre.trim().length > 0;
+
+  const cargados = bs.filter((b) => b.nombre.trim());
+  const suma = sumaPorcentajes(cargados);
+  const errores = [];
+  if (!f.apellido.trim() || !f.nombre.trim()) errores.push("Apellido y nombre son obligatorios.");
+  if (bs.some((b) => !b.nombre.trim() && (b.dni || b.parentesco || b.fechaNacimiento || b.telefono || b.porcentaje)))
+    errores.push("Hay un beneficiario con datos pero sin nombre completo.");
+  if (cargados.length > 0) {
+    if (cargados.some((b) => !(parseFloat(b.porcentaje) > 0))) errores.push("Cada beneficiario debe tener un porcentaje mayor a 0.");
+    else if (Math.abs(suma - 100) > 0.001) errores.push(`Los porcentajes de los beneficiarios suman ${suma}%: deben sumar exactamente 100%.`);
+  }
+  function guardar() {
+    if (errores.length) { setIntento(true); return; }
+    onSave(f, l, bs);
+  }
+
+  const grid = { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 18 };
+  const seccion = (txt) => (
+    <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: 0.6, color: C.navy, textTransform: "uppercase",
+      borderBottom: `2px solid ${C.gold}`, paddingBottom: 4, marginBottom: 10 }}>{txt}</div>
+  );
+  const nota = (txt) => <div style={{ fontSize: 11, color: C.inkSoft, marginBottom: 10, lineHeight: 1.45 }}>{txt}</div>;
+  const remun = nomina && nomina.salarioBasico ? `$ ${Number(nomina.salarioBasico).toLocaleString("es-AR")}` : "sin cargar";
+
   return (
     <div>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 14 }}>
-        <Field label="Apellido" value={f.apellido} onChange={set("apellido")} />
-        <Field label="Nombre" value={f.nombre} onChange={set("nombre")} />
-        <Field label="DNI" value={f.dni} onChange={set("dni")} />
+      {seccion("1. Datos personales del trabajador")}
+      <div style={grid}>
+        <Field label="Apellido(s)" value={f.apellido} onChange={set("apellido")} />
+        <Field label="Nombre(s)" value={f.nombre} onChange={set("nombre")} />
+        <Field label="Documento de identidad (DNI)" value={f.dni} onChange={set("dni")} />
         <Field label="CUIL" value={f.cuil} onChange={set("cuil")} />
-        <Field label="Cargo" value={f.cargo} onChange={set("cargo")} options={CARGOS} />
-        <Field label="Categoría REGINAVE" value={f.categoriaReginave} onChange={set("categoriaReginave")} options={CATEGORIAS} />
+        <Field label="Fecha de nacimiento" type="date" value={f.fNacimiento} onChange={set("fNacimiento")} />
+        <Field label="Lugar de nacimiento" value={l.lugarNacimiento} onChange={setLeg("lugarNacimiento")} />
+        <Field label="Nacionalidad" value={l.nacionalidad} onChange={setLeg("nacionalidad")} />
+        <Field label="Estado civil" value={l.estadoCivil} onChange={setLeg("estadoCivil")} options={ESTADOS_CIVILES} />
+        <Field label="Género" value={l.genero} onChange={setLeg("genero")} options={GENEROS} />
+        <div />
+      </div>
+
+      {seccion("2. Datos de contacto y domicilio")}
+      <div style={grid}>
+        <Field label="Domicilio actual (calle y número)" value={l.domicilioCalle} onChange={setLeg("domicilioCalle")} span={2} />
+        <Field label="Piso / Departamento" value={l.domicilioPiso} onChange={setLeg("domicilioPiso")} />
+        <Field label="Código postal" value={l.codigoPostal} onChange={setLeg("codigoPostal")} />
+        <Field label="Ciudad" value={l.ciudad} onChange={setLeg("ciudad")} />
+        <Field label="Provincia" value={l.provincia} onChange={setLeg("provincia")} />
+        <Field label="País" value={l.pais} onChange={setLeg("pais")} />
+        <div />
+        <Field label="Teléfono celular" value={l.telefonoCelular} onChange={setLeg("telefonoCelular")} />
+        <Field label="Teléfono fijo" value={l.telefonoFijo} onChange={setLeg("telefonoFijo")} />
+        <Field label="Correo electrónico personal" value={l.email} onChange={setLeg("email")} span={2} />
+      </div>
+
+      {seccion("3. Información laboral (uso exclusivo de la empresa)")}
+      <div style={grid}>
+        <Field label="Código de empleado" value={l.codigoEmpleado} onChange={setLeg("codigoEmpleado")} />
+        <Field label="Fecha de ingreso" type="date" value={f.fIngreso} onChange={set("fIngreso")} />
+        <Field label="Puesto / Cargo" value={f.cargo} onChange={set("cargo")} options={CARGOS} />
+        <Field label="Área / Departamento" value={l.area} onChange={setLeg("area")} />
+        <Field label="Tipo de contrato" value={l.tipoContrato} onChange={setLeg("tipoContrato")} options={TIPOS_CONTRATO} />
         <Field label="Lancha asignada" value={f.lancha} onChange={set("lancha")} options={lanchaOpciones} />
-        <Field label="Distrito PNA" value={f.distritoPNA} onChange={set("distritoPNA")} />
         <Field label="Estado" value={f.estado} onChange={set("estado")} options={["Activo", "Licencia", "Suspendido", "Baja"]} />
         <div />
-        <Field label="Fecha Nacimiento" type="date" value={f.fNacimiento} onChange={set("fNacimiento")} />
-        <Field label="Fecha Ingreso" type="date" value={f.fIngreso} onChange={set("fIngreso")} />
+        <div style={{ gridColumn: "span 2", background: C.celesteLight, color: C.navy, borderRadius: 10, padding: 10, fontSize: 11.5, lineHeight: 1.5 }}>
+          <b>Remuneración bruta mensual:</b> {remun} &nbsp;·&nbsp; <b>CBU:</b> {nomina && nomina.cbu ? maskCBU(nomina.cbu) : "sin cargar"}
+          <div style={{ opacity: 0.8, marginTop: 2 }}>Se editan en la pestaña «Nómina y CCT» (acceso restringido).</div>
+        </div>
       </div>
+
+      {seccion("4. Contacto de emergencia")}
+      <div style={grid}>
+        <Field label="Nombre completo" value={l.emergenciaNombre} onChange={setLeg("emergenciaNombre")} />
+        <Field label="Parentesco" value={l.emergenciaParentesco} onChange={setLeg("emergenciaParentesco")} />
+        <Field label="Teléfono de contacto (24/7)" value={l.emergenciaTelefono} onChange={setLeg("emergenciaTelefono")} span={2} />
+      </div>
+
+      {seccion("5. Designación de beneficiarios (seguro de vida / fallecimiento)")}
+      {nota("En caso de fallecimiento del trabajador, las indemnizaciones, seguros de vida vigentes y/o haberes devengados pendientes se distribuirán entre las siguientes personas según los porcentajes indicados. La suma debe ser estrictamente 100%.")}
+      {bs.map((b, i) => (
+        <div key={i} style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 10, padding: 10, marginBottom: 10 }}>
+          <div style={{ fontSize: 11.5, fontWeight: 800, color: C.navy, marginBottom: 8 }}>Beneficiario {i + 1}</div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+            <Field label="Nombre completo" value={b.nombre} onChange={setBen(i, "nombre")} span={2} />
+            <Field label="DNI / Documento" value={b.dni} onChange={setBen(i, "dni")} />
+            <Field label="Parentesco" value={b.parentesco} onChange={setBen(i, "parentesco")} />
+            <Field label="Fecha de nacimiento" type="date" value={b.fechaNacimiento} onChange={setBen(i, "fechaNacimiento")} />
+            <Field label="Teléfono" value={b.telefono} onChange={setBen(i, "telefono")} />
+            <Field label="Porcentaje asignado (%)" type="number" value={b.porcentaje} onChange={setBen(i, "porcentaje")} span={2} />
+          </div>
+        </div>
+      ))}
+      {cargados.length > 0 && (
+        <div style={{ marginBottom: 18 }}>
+          <Pill bg={Math.abs(suma - 100) < 0.001 ? C.greenLight : C.redLight} fg={Math.abs(suma - 100) < 0.001 ? C.green : C.red}>
+            Suma de porcentajes: {suma}% {Math.abs(suma - 100) < 0.001 ? "✓" : "— debe ser 100%"}
+          </Pill>
+        </div>
+      )}
+
+      {seccion("6. Declaración jurada y firma")}
+      {nota("Declaro bajo juramento que todos los datos asentados en este formulario son correctos, completos y fiel expresión de la verdad. Me comprometo a notificar formalmente a la empresa cualquier cambio que ocurra en la información aquí brindada en un plazo no mayor a 30 días.")}
+      <div style={grid}>
+        <Field label="Ciudad de firma" value={l.declaracionCiudad} onChange={setLeg("declaracionCiudad")} />
+        <Field label="Fecha de firma" type="date" value={l.declaracionFecha} onChange={setLeg("declaracionFecha")} />
+        <div style={{ gridColumn: "span 2", fontSize: 11, color: C.inkSoft }}>La firma se realiza en papel. Registrá acá la fecha en que el trabajador firmó.</div>
+      </div>
+
+      {intento && errores.length > 0 && (
+        <div style={{ background: C.redLight, color: C.red, borderRadius: 10, padding: 10, fontSize: 12, marginBottom: 12 }}>
+          {errores.map((e, i) => <div key={i}>• {e}</div>)}
+        </div>
+      )}
       <div style={{ display: "flex", gap: 8 }}>
         <Btn tone="ghost" onClick={onCancel} full>Cancelar</Btn>
-        <Btn tone="primary" icon={Save} disabled={!valid} onClick={() => onSave(f)} full>Guardar</Btn>
+        <Btn tone="primary" icon={Save} onClick={guardar} full>Guardar legajo</Btn>
       </div>
     </div>
   );
@@ -740,7 +900,7 @@ function HabilitacionesTab({ empleados, setEmpleados, canEdit }) {
                 {canEdit && <IconBtn icon={Pencil} onClick={() => setEditing(e)} title="Editar" />}
               </div>
               <div style={{ fontSize: 11.5, color: C.inkSoft, marginBottom: 6 }}>
-                Libreta: {e.libretaEmbarco || "—"} · {e.categoriaReginave || "Sin categoría"}
+                Libreta: {e.libretaEmbarco || "—"}
               </div>
               <Pill bg={t.bg} fg={t.fg}>{t.label}</Pill>
             </div>
@@ -762,8 +922,6 @@ function HabForm({ emp, onCancel, onSave }) {
     <div>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 14 }}>
         <Field label="N° Libreta de Embarco" value={f.libretaEmbarco} onChange={set("libretaEmbarco")} span={2} />
-        <Field label="Categoría REGINAVE" value={f.categoriaReginave} onChange={set("categoriaReginave")} options={CATEGORIAS} />
-        <Field label="Distrito PNA" value={f.distritoPNA} onChange={set("distritoPNA")} />
         <Field label="Venc. Libreta" type="date" value={f.vencLibreta} onChange={set("vencLibreta")} />
         <Field label="Venc. Habilitación" type="date" value={f.vencHabilitacion} onChange={set("vencHabilitacion")} />
       </div>
@@ -1534,7 +1692,7 @@ function NominaCCTTab({ empleados, items, setItems, canEdit }) {
       <SectionTitle icon={DollarSign} title="Nómina y CCT" subtitle="Información salarial — acceso restringido a RRHH" />
       <div style={{ background: C.orangeLight, color: C.orange, padding: 10, borderRadius: 10, fontSize: 11.5, marginBottom: 12, display: "flex", gap: 8 }}>
         <Info size={14} style={{ flexShrink: 0, marginTop: 1 }} />
-        Esta información es sensible. No se muestra en el rol Patrón.
+        Esta información es sensible. Solo la ven RRHH y Presidencia.
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         {empleados.map((e) => {
@@ -1544,10 +1702,10 @@ function NominaCCTTab({ empleados, items, setItems, canEdit }) {
               <div>
                 <div style={{ fontWeight: 700, fontSize: 13, color: C.navy }}>{e.apellido}, {e.nombre}</div>
                 <div style={{ fontSize: 11.5, color: C.inkSoft, marginTop: 2 }}>
-                  {n ? `${n.categoriaCCT || "—"} · Básico $${Number(n.salarioBasico || 0).toLocaleString("es-AR")}` : "Sin datos cargados"}
+                  {n ? `${n.categoriaCCT || "—"} · Básico $${Number(n.salarioBasico || 0).toLocaleString("es-AR")}${n.cbu ? ` · CBU ${maskCBU(n.cbu)}` : ""}` : "Sin datos cargados"}
                 </div>
               </div>
-              {canEdit && <IconBtn icon={Pencil} onClick={() => setEditing(n || { empleadoId: e.id, categoriaCCT: "", salarioBasico: "" })} title="Editar" />}
+              {canEdit && <IconBtn icon={Pencil} onClick={() => setEditing(n || { empleadoId: e.id, categoriaCCT: "", salarioBasico: "", cbu: "" })} title="Editar" />}
             </div>
           );
         })}
@@ -1557,10 +1715,12 @@ function NominaCCTTab({ empleados, items, setItems, canEdit }) {
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 14 }}>
             <Field label="Categoría CCT" value={editing.categoriaCCT} onChange={(v) => setEditing({ ...editing, categoriaCCT: v })} />
             <Field label="Salario básico ($)" type="number" value={editing.salarioBasico} onChange={(v) => setEditing({ ...editing, salarioBasico: v })} />
+            <Field label="CBU / cuenta bancaria para pago" value={editing.cbu || ""} onChange={(v) => setEditing({ ...editing, cbu: v })} span={2} placeholder="22 dígitos" />
+            {!cbuValido(editing.cbu) && <div style={{ gridColumn: "span 2", color: C.red, fontSize: 11.5 }}>El CBU debe tener exactamente 22 dígitos.</div>}
           </div>
           <div style={{ display: "flex", gap: 8 }}>
             <Btn tone="ghost" onClick={() => setEditing(null)} full>Cancelar</Btn>
-            <Btn tone="primary" icon={Save} onClick={() => save(editing)} full>Guardar</Btn>
+            <Btn tone="primary" icon={Save} disabled={!cbuValido(editing.cbu)} onClick={() => save({ ...editing, cbu: (editing.cbu || "").replace(/\s/g, "") })} full>Guardar</Btn>
           </div>
         </Modal>
       )}
