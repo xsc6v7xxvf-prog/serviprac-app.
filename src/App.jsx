@@ -12,6 +12,7 @@ import {
   DOTACION_REF, CARGOS, ESTADOS_CIVILES, CURSOS_REGINAVE, TIPOS_SANCION,
   TIPOS_EXAMEN_SRT, RESULTADOS_EXAMEN_SRT,
   GENEROS, TIPOS_CONTRATO, LEGAJO_VACIO, BENEF_VACIO, sumaPorcentajes, cbuValido, maskCBU, estadoLegajo,
+  TIPOS_DOCUMENTO, VINCULOS, NIVELES_ESCOLARES, FAMILIAR_VACIO, cuilValido, formatCUIL,
   uid, todayISO, daysUntil, expiryTone, fmtDate, age, antiguedad,
   veredicto, groupByArea, useSupabaseTable,
   iniciarSesion, cerrarSesion, restaurarSesion,
@@ -379,6 +380,7 @@ export default function App() {
   const [examenesSRT, setExamenesSRT, r10] = useSupabaseTable("examenes_srt");
   const [legajos, setLegajos] = useSupabaseTable("legajos");
   const [beneficiarios, setBeneficiarios] = useSupabaseTable("beneficiarios");
+  const [grupoFamiliar, setGrupoFamiliar] = useSupabaseTable("grupo_familiar");
   const [errorGuardado, setErrorGuardado] = useState(null);
   useEffect(() => {
     const h = (e) => setErrorGuardado(e.detail);
@@ -452,7 +454,8 @@ export default function App() {
             )}
             {tab === "personal" && (
               <PersonalTab empleados={empleados} setEmpleados={setEmpleados} canEdit={canEdit} embarcaciones={embarcaciones}
-                legajos={legajos} setLegajos={setLegajos} beneficiarios={beneficiarios} setBeneficiarios={setBeneficiarios} nomina={nomina} />
+                legajos={legajos} setLegajos={setLegajos} beneficiarios={beneficiarios} setBeneficiarios={setBeneficiarios} nomina={nomina}
+                grupoFamiliar={grupoFamiliar} setGrupoFamiliar={setGrupoFamiliar} />
             )}
             {tab === "embarcaciones" && (
               <EmbarcacionesTab items={embarcaciones} setItems={setEmbarcaciones} isPresidente={isPresidente} />
@@ -628,7 +631,7 @@ function Dashboard({ empleados, sanciones, incidentes, evaluaciones, capacitacio
     </div>
   );
 }
-function PersonalTab({ empleados, setEmpleados, canEdit, embarcaciones, legajos, setLegajos, beneficiarios, setBeneficiarios, nomina }) {
+function PersonalTab({ empleados, setEmpleados, canEdit, embarcaciones, legajos, setLegajos, beneficiarios, setBeneficiarios, nomina, grupoFamiliar, setGrupoFamiliar }) {
   const [q, setQ] = useState("");
   const [editing, setEditing] = useState(null);
   const [adding, setAdding] = useState(false);
@@ -636,6 +639,7 @@ function PersonalTab({ empleados, setEmpleados, canEdit, embarcaciones, legajos,
   const legPorEmp = Object.fromEntries(legajos.map((l) => [l.empleadoId, l]));
   const nomPorEmp = Object.fromEntries(nomina.map((n) => [n.empleadoId, n]));
   const benDe = (id) => beneficiarios.filter((b) => b.empleadoId === id).sort((a, b) => a.orden - b.orden);
+  const famDe = (id) => grupoFamiliar.filter((f) => f.empleadoId === id);
 
   const filtered = empleados.filter((e) =>
     `${e.apellido} ${e.nombre} ${e.dni}`.toLowerCase().includes(q.toLowerCase())
@@ -659,18 +663,28 @@ function PersonalTab({ empleados, setEmpleados, canEdit, embarcaciones, legajos,
     await setBeneficiarios([...beneficiarios.filter((b) => b.empleadoId !== empId), ...nuevos]);
   }
 
-  async function save(emp, leg, bens) {
+  async function guardarFamilia(empId, filas) {
+    const nuevos = filas.map((f) => ({
+      ...f, apellidos: f.apellidos.trim(), nombres: f.nombres.trim(), cuil: formatCUIL(f.cuil),
+      empleadoId: empId, id: f.id || uid("FAM"),
+    }));
+    await setGrupoFamiliar([...grupoFamiliar.filter((f) => f.empleadoId !== empId), ...nuevos]);
+  }
+
+  async function save(emp, leg, bens, fams) {
     setEditing(null);
     setEmpleados(empleados.map((e) => (e.id === emp.id ? emp : e)));
     await guardarLegajo(emp.id, leg);
+    await guardarFamilia(emp.id, fams);
     await guardarBenef(emp.id, bens);
   }
-  async function add(emp, leg, bens) {
+  async function add(emp, leg, bens, fams) {
     setAdding(false);
     const insertados = await setEmpleados([{ ...emp, id: uid("EMP") }, ...empleados]);
     const real = insertados && insertados[0];
     if (!real) return;              // el aviso de error ya se mostró
     await guardarLegajo(real.id, leg);
+    await guardarFamilia(real.id, fams);
     await guardarBenef(real.id, bens);
   }
   function toggleBaja(emp) {
@@ -698,6 +712,9 @@ function PersonalTab({ empleados, setEmpleados, canEdit, embarcaciones, legajos,
                 </div>
                 <div style={{ marginTop: 4, display: "flex", gap: 6, flexWrap: "wrap" }}>
                   {e.estado === "Baja" && <Pill bg={C.redLight} fg={C.red}>Baja</Pill>}
+                  {canEdit && famDe(e.id).length > 0 && (
+                    <Pill bg={C.celesteLight} fg={C.navy}>Grupo familiar: {famDe(e.id).length}</Pill>
+                  )}
                   {canEdit && (
                     <span title={completo ? "Legajo completo" : `Falta: ${est.faltan.join(", ")}`}>
                       <Pill bg={completo ? C.greenLight : C.orangeLight} fg={completo ? C.green : C.orange}>Legajo {est.hechos}/{est.total}</Pill>
@@ -725,7 +742,7 @@ function PersonalTab({ empleados, setEmpleados, canEdit, embarcaciones, legajos,
       )}
       {editing && (
         <Modal title={`Legajo — ${editing.apellido}, ${editing.nombre}`} onClose={() => setEditing(null)} wide>
-          <PersonalForm emp={editing} legajo={legPorEmp[editing.id]} benefs={benDe(editing.id)} nomina={nomPorEmp[editing.id]}
+          <PersonalForm emp={editing} legajo={legPorEmp[editing.id]} benefs={benDe(editing.id)} familia={famDe(editing.id)} nomina={nomPorEmp[editing.id]}
             onCancel={() => setEditing(null)} onSave={save} embarcaciones={embarcaciones} />
         </Modal>
       )}
@@ -743,7 +760,17 @@ function SearchBox({ q, setQ, placeholder }) {
   );
 }
 
-function PersonalForm({ emp, legajo, benefs, nomina, onCancel, onSave, embarcaciones }) {
+function Casilla({ label, checked, onChange }) {
+  return (
+    <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12.5, color: C.ink, cursor: "pointer",
+      background: checked ? C.celesteLight : C.card, border: `1px solid ${checked ? C.celeste : C.border}`, borderRadius: 8, padding: "8px 10px" }}>
+      <input type="checkbox" checked={!!checked} onChange={(e) => onChange(e.target.checked)} style={{ width: 16, height: 16, accentColor: C.navy }} />
+      {label}
+    </label>
+  );
+}
+
+function PersonalForm({ emp, legajo, benefs, familia, nomina, onCancel, onSave, embarcaciones }) {
   const [f, setF] = useState(emp || {
     apellido: "", nombre: "", dni: "", cuil: "", fNacimiento: "", fIngreso: todayISO(),
     cargo: "", lancha: "", estado: "Activo",
@@ -754,10 +781,12 @@ function PersonalForm({ emp, legajo, benefs, nomina, onCancel, onSave, embarcaci
     const b = (benefs || []).find((x) => x.orden === i + 1);
     return b ? { ...b } : BENEF_VACIO();
   }));
+  const [fams, setFams] = useState(() => (familia || []).map((x) => ({ ...x })));
   const [intento, setIntento] = useState(false);
   const set = (k) => (v) => setF({ ...f, [k]: v });
   const setLeg = (k) => (v) => setL({ ...l, [k]: v });
   const setBen = (i, k) => (v) => setBs(bs.map((b, j) => (j === i ? { ...b, [k]: v } : b)));
+  const setFam = (i, k) => (v) => setFams(fams.map((x, j) => (j === i ? { ...x, [k]: v } : x)));
   const lanchaOpciones = (embarcaciones || []).filter((b) => b.estado === "Activa").map((b) => b.nombre);
 
   const cargados = bs.filter((b) => b.nombre.trim());
@@ -770,9 +799,19 @@ function PersonalForm({ emp, legajo, benefs, nomina, onCancel, onSave, embarcaci
     if (cargados.some((b) => !(parseFloat(b.porcentaje) > 0))) errores.push("Cada beneficiario debe tener un porcentaje mayor a 0.");
     else if (Math.abs(suma - 100) > 0.001) errores.push(`Los porcentajes de los beneficiarios suman ${suma}%: deben sumar exactamente 100%.`);
   }
+  const hoyISO = todayISO();
+  const anioActual = new Date().getFullYear();
+  fams.forEach((x, i) => {
+    const n = `Familiar ${i + 1}`;
+    if (!x.apellidos.trim() || !x.nombres.trim()) errores.push(`${n}: apellidos y nombres son obligatorios.`);
+    if (!x.vinculo) errores.push(`${n}: indicá el vínculo o parentesco.`);
+    if (x.cuil && !cuilValido(x.cuil)) errores.push(`${n}: el CUIL no es válido (revisá los 11 dígitos).`);
+    if (x.fechaNacimiento && x.fechaNacimiento > hoyISO) errores.push(`${n}: la fecha de nacimiento no puede ser futura.`);
+    if (x.certificadoEscolarAnio && !/^\d{4}$/.test(x.certificadoEscolarAnio)) errores.push(`${n}: el año del certificado escolar debe tener 4 dígitos.`);
+  });
   function guardar() {
     if (errores.length) { setIntento(true); return; }
-    onSave(f, l, bs);
+    onSave(f, l, bs, fams);
   }
 
   const grid = { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 18 };
@@ -836,7 +875,60 @@ function PersonalForm({ emp, legajo, benefs, nomina, onCancel, onSave, embarcaci
         <Field label="Teléfono de contacto (24/7)" value={l.emergenciaTelefono} onChange={setLeg("emergenciaTelefono")} span={2} />
       </div>
 
-      {seccion("5. Designación de beneficiarios (seguro de vida / fallecimiento)")}
+      {seccion("5. Grupo familiar")}
+      {nota("Cónyuge, concubino/a, hijos/as y otros familiares. Indicá si está a cargo del trabajador y si genera derecho a asignaciones familiares y a cobertura de obra social.")}
+      {fams.map((x, i) => {
+        const edad = x.fechaNacimiento ? age(x.fechaNacimiento) : null;
+        const esHijo = x.vinculo === "Hijo/a";
+        const certViejo = esHijo && x.nivelEscolar && x.nivelEscolar !== "No escolarizado" && x.certificadoEscolarAnio !== String(anioActual);
+        const cudVencido = x.discapacidad && x.cudVencimiento && x.cudVencimiento < hoyISO;
+        return (
+          <div key={x.id || `n${i}`} style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 10, padding: 10, marginBottom: 10 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8, gap: 8 }}>
+              <div style={{ fontSize: 11.5, fontWeight: 800, color: C.navy }}>
+                Familiar {i + 1}{x.vinculo ? ` · ${x.vinculo}` : ""}{edad !== null && edad !== "—" ? ` · ${edad} años` : ""}
+              </div>
+              <IconBtn icon={Trash2} tone="danger" onClick={() => setFams(fams.filter((_, j) => j !== i))} title="Quitar familiar" />
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+              <Field label="Apellido(s)" value={x.apellidos} onChange={setFam(i, "apellidos")} />
+              <Field label="Nombre(s)" value={x.nombres} onChange={setFam(i, "nombres")} />
+              <Field label="Tipo de documento" value={x.tipoDocumento} onChange={setFam(i, "tipoDocumento")} options={TIPOS_DOCUMENTO} />
+              <Field label="Número de documento" value={x.numeroDocumento} onChange={setFam(i, "numeroDocumento")} />
+              <Field label="CUIL" value={x.cuil} onChange={setFam(i, "cuil")} placeholder="20-12345678-9" />
+              <Field label="Fecha de nacimiento" type="date" value={x.fechaNacimiento} onChange={setFam(i, "fechaNacimiento")} />
+              <Field label="Vínculo o parentesco" value={x.vinculo} onChange={setFam(i, "vinculo")} options={VINCULOS} span={2} />
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginTop: 10 }}>
+              <Casilla label="A cargo del trabajador" checked={x.aCargo} onChange={setFam(i, "aCargo")} />
+              <Casilla label="Genera asignaciones familiares" checked={x.asignaciones} onChange={setFam(i, "asignaciones")} />
+              <Casilla label="Cobertura de obra social" checked={x.obraSocial} onChange={setFam(i, "obraSocial")} />
+              <Casilla label="Convive con el trabajador" checked={x.convive} onChange={setFam(i, "convive")} />
+              <Casilla label="Discapacidad (CUD)" checked={x.discapacidad} onChange={setFam(i, "discapacidad")} />
+            </div>
+            {(x.discapacidad || esHijo) && (
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 10 }}>
+                {x.discapacidad && <Field label="Vencimiento del CUD" type="date" value={x.cudVencimiento} onChange={setFam(i, "cudVencimiento")} span={esHijo ? 1 : 2} />}
+                {esHijo && <Field label="Nivel escolar" value={x.nivelEscolar} onChange={setFam(i, "nivelEscolar")} options={NIVELES_ESCOLARES} span={x.discapacidad ? 1 : 2} />}
+                {esHijo && x.nivelEscolar && x.nivelEscolar !== "No escolarizado" && (
+                  <Field label="Año del último certificado de escolaridad" type="number" value={x.certificadoEscolarAnio} onChange={setFam(i, "certificadoEscolarAnio")} placeholder={String(anioActual)} span={2} />
+                )}
+              </div>
+            )}
+            {(certViejo || cudVencido) && (
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 8 }}>
+                {certViejo && <Pill bg={C.orangeLight} fg={C.orange}>Falta certificado de escolaridad {anioActual}</Pill>}
+                {cudVencido && <Pill bg={C.redLight} fg={C.red}>CUD vencido</Pill>}
+              </div>
+            )}
+          </div>
+        );
+      })}
+      <div style={{ marginBottom: 18 }}>
+        <Btn tone="ghost" icon={Plus} onClick={() => setFams([...fams, FAMILIAR_VACIO()])} full>Agregar familiar</Btn>
+      </div>
+
+      {seccion("6. Designación de beneficiarios (seguro de vida / fallecimiento)")}
       {nota("En caso de fallecimiento del trabajador, las indemnizaciones, seguros de vida vigentes y/o haberes devengados pendientes se distribuirán entre las siguientes personas según los porcentajes indicados. La suma debe ser estrictamente 100%.")}
       {bs.map((b, i) => (
         <div key={i} style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 10, padding: 10, marginBottom: 10 }}>
@@ -859,7 +951,7 @@ function PersonalForm({ emp, legajo, benefs, nomina, onCancel, onSave, embarcaci
         </div>
       )}
 
-      {seccion("6. Declaración jurada y firma")}
+      {seccion("7. Declaración jurada y firma")}
       {nota("Declaro bajo juramento que todos los datos asentados en este formulario son correctos, completos y fiel expresión de la verdad. Me comprometo a notificar formalmente a la empresa cualquier cambio que ocurra en la información aquí brindada en un plazo no mayor a 30 días.")}
       <div style={grid}>
         <Field label="Ciudad de firma" value={l.declaracionCiudad} onChange={setLeg("declaracionCiudad")} />
