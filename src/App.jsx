@@ -839,6 +839,7 @@ function MedicosTab({ empleados, setEmpleados, canEdit, examenesSRT, setExamenes
 
 function ExamenesSRTPanel({ empleado, items, setItems, allItems, canEdit }) {
   const [adding, setAdding] = useState(false);
+  const [editing, setEditing] = useState(null);
   const [descargando, setDescargando] = useState(null);
   const [errorArchivo, setErrorArchivo] = useState("");
 
@@ -853,6 +854,20 @@ function ExamenesSRTPanel({ empleado, items, setItems, allItems, canEdit }) {
     const nuevo = { ...form, empleadoId: empleado.id, id: uid("SRT"), archivoPath, archivoNombre };
     setItems([nuevo, ...allItems]);
     setAdding(false);
+  }
+
+  async function saveEdit(form, file, original) {
+    setErrorArchivo("");
+    let archivoPath = original.archivoPath, archivoNombre = original.archivoNombre;
+    if (file) {
+      const res = await subirArchivoExamen(empleado.id, file);
+      if (res.error) { setErrorArchivo("No se pudo subir el archivo: " + res.error); return; }
+      if (original.archivoPath) await borrarArchivoExamen(original.archivoPath);
+      archivoPath = res.path; archivoNombre = res.nombre;
+    }
+    const actualizado = { ...original, ...form, archivoPath, archivoNombre };
+    setItems(allItems.map((i) => (i.id === original.id ? actualizado : i)));
+    setEditing(null);
   }
 
   async function remove(item) {
@@ -871,13 +886,17 @@ function ExamenesSRTPanel({ empleado, items, setItems, allItems, canEdit }) {
 
   return (
     <div>
-      {canEdit && !adding && (
+      {canEdit && !adding && !editing && (
         <Btn tone="gold" icon={Plus} onClick={() => setAdding(true)} full>Nuevo examen</Btn>
       )}
       {errorArchivo && (
         <div style={{ color: C.red, fontSize: 12, background: C.redLight, padding: 8, borderRadius: 8, marginTop: 10 }}>{errorArchivo}</div>
       )}
       {adding && <ExamenSRTForm onCancel={() => setAdding(false)} onSave={add} />}
+      {editing && (
+        <ExamenSRTForm initial={editing} onCancel={() => setEditing(null)}
+          onSave={(form, file) => saveEdit(form, file, editing)} />
+      )}
 
       <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 14 }}>
         {items.map((it) => (
@@ -887,6 +906,7 @@ function ExamenesSRTPanel({ empleado, items, setItems, allItems, canEdit }) {
                 <div style={{ display: "flex", gap: 6, marginBottom: 4 }}>
                   <Pill bg={C.celesteLight} fg={C.navy}>{it.tipo}</Pill>
                   {it.resultado && <Pill bg={it.resultado === "No Apto" ? C.redLight : C.greenLight} fg={it.resultado === "No Apto" ? C.red : C.green}>{it.resultado}</Pill>}
+                  {!it.archivoPath && <Pill bg={C.orangeLight} fg={C.orange}>Sin PDF</Pill>}
                 </div>
                 <div style={{ fontSize: 12, color: C.ink }}>Fecha: {fmtDate(it.fecha)}</div>
                 {it.proximoVencimiento && <div style={{ fontSize: 11.5, color: C.inkSoft }}>Próximo: {fmtDate(it.proximoVencimiento)}</div>}
@@ -897,6 +917,7 @@ function ExamenesSRTPanel({ empleado, items, setItems, allItems, canEdit }) {
                   <IconBtn icon={Eye} tone="primary" onClick={() => descargar(it)}
                     title={descargando === it.id ? "Generando enlace…" : `Descargar ${it.archivoNombre || "PDF"}`} />
                 )}
+                {canEdit && <IconBtn icon={Pencil} onClick={() => setEditing(it)} title={it.archivoPath ? "Editar / reemplazar PDF" : "Editar / adjuntar PDF"} />}
                 {canEdit && <IconBtn icon={Trash2} tone="danger" onClick={() => remove(it)} title="Eliminar" />}
               </div>
             </div>
@@ -908,8 +929,10 @@ function ExamenesSRTPanel({ empleado, items, setItems, allItems, canEdit }) {
   );
 }
 
-function ExamenSRTForm({ onCancel, onSave }) {
-  const [f, setF] = useState({ tipo: "Periódico", fecha: todayISO(), resultado: "Apto", proximoVencimiento: "", notas: "" });
+function ExamenSRTForm({ initial, onCancel, onSave }) {
+  const [f, setF] = useState(initial
+    ? { tipo: initial.tipo, fecha: initial.fecha, resultado: initial.resultado || "Apto", proximoVencimiento: initial.proximoVencimiento || "", notas: initial.notas || "" }
+    : { tipo: "Periódico", fecha: todayISO(), resultado: "Apto", proximoVencimiento: "", notas: "" });
   const [file, setFile] = useState(null);
   const [guardando, setGuardando] = useState(false);
   const set = (k) => (v) => setF({ ...f, [k]: v });
@@ -930,7 +953,9 @@ function ExamenSRTForm({ onCancel, onSave }) {
         <Field label="Notas (opcional)" value={f.notas} onChange={set("notas")} span={2} />
       </div>
       <div style={{ marginBottom: 12 }}>
-        <div style={{ fontSize: 11.5, fontWeight: 700, color: C.inkSoft, marginBottom: 5 }}>PDF del resultado (opcional)</div>
+        <div style={{ fontSize: 11.5, fontWeight: 700, color: C.inkSoft, marginBottom: 5 }}>
+          {initial?.archivoPath ? `PDF actual: ${initial.archivoNombre || "archivo cargado"} — subir uno nuevo lo reemplaza` : "PDF del resultado (opcional)"}
+        </div>
         <input type="file" accept="application/pdf" onChange={(e) => setFile(e.target.files[0] || null)}
           style={{ fontSize: 12.5, width: "100%" }} />
       </div>
