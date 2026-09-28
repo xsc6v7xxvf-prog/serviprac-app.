@@ -481,6 +481,30 @@ export function estadoLegajo(leg, bens) {
   ];
   return { hechos: checks.filter((c) => c[1]).length, total: checks.length, faltan: checks.filter((c) => !c[1]).map((c) => c[0]) };
 }
+export const TIPOS_DOCUMENTO = ["DNI", "Pasaporte", "Cédula extranjera", "Otro"];
+export const VINCULOS = ["Cónyuge", "Concubino/a", "Hijo/a", "Otro"];
+export const NIVELES_ESCOLARES = ["Inicial", "Primario", "Secundario", "Terciario / Universitario", "No escolarizado"];
+export const FAMILIAR_VACIO = () => ({
+  tipoDocumento: "DNI", numeroDocumento: "", cuil: "", apellidos: "", nombres: "", fechaNacimiento: "", vinculo: "",
+  aCargo: false, asignaciones: false, obraSocial: false, convive: false, discapacidad: false, cudVencimiento: "",
+  nivelEscolar: "", certificadoEscolarAnio: "",
+});
+/** CUIL/CUIT: 11 dígitos con dígito verificador (módulo 11). Acepta con o sin guiones. */
+export function cuilValido(v) {
+  const d = String(v || "").replace(/\D/g, "");
+  if (!v) return true;
+  if (d.length !== 11) return false;
+  const pesos = [5, 4, 3, 2, 7, 6, 5, 4, 3, 2];
+  const suma = pesos.reduce((a, p, i) => a + p * Number(d[i]), 0);
+  let dv = 11 - (suma % 11);
+  if (dv === 11) dv = 0;
+  if (dv === 10) return false;
+  return dv === Number(d[10]);
+}
+export const formatCUIL = (v) => {
+  const d = String(v || "").replace(/\D/g, "");
+  return d.length === 11 ? `${d.slice(0, 2)}-${d.slice(2, 10)}-${d[10]}` : v;
+};
 export const CARGOS = ["Patrón Motorista Profesional de Primera", "Patrón Motorista Profesional de Segunda", "Patrón Motorista Profesional de Tercera", "Marinero con Máximo de Cargo", "Marinero de Puente", "Marinero Especial", "Marinero", "Auxiliar de Máquinas Navales", "Maestranza-Camarero", "Práctico", "Administrativo"];
 export const CURSOS_REGINAVE = ["Formación Básica de Seguridad (FBS)", "Lucha Contra Incendio", "Técnicas de Supervivencia",
   "Operador Radio Restringido (ORR)", "Primeros Auxilios a Bordo", "Manejo Seguro de Lanchas de Practicaje", "Prevención de Contaminación (MARPOL)"];
@@ -733,6 +757,24 @@ const mapBeneficiario = {
   }),
 };
 
+const mapFamiliar = {
+  fromDb: (r) => ({
+    id: r.id, empleadoId: r.empleado_id, tipoDocumento: r.tipo_documento || "", numeroDocumento: r.numero_documento || "",
+    cuil: r.cuil || "", apellidos: r.apellidos || "", nombres: r.nombres || "", fechaNacimiento: r.fecha_nacimiento || "",
+    vinculo: r.vinculo || "", aCargo: !!r.a_cargo, asignaciones: !!r.asignaciones_familiares, obraSocial: !!r.cobertura_obra_social,
+    convive: !!r.convive, discapacidad: !!r.discapacidad, cudVencimiento: r.cud_vencimiento || "",
+    nivelEscolar: r.nivel_escolar || "", certificadoEscolarAnio: r.certificado_escolar_anio ? String(r.certificado_escolar_anio) : "",
+  }),
+  toDb: (e) => ({
+    empleado_id: e.empleadoId, tipo_documento: e.tipoDocumento || null, numero_documento: e.numeroDocumento || null,
+    cuil: e.cuil || null, apellidos: e.apellidos, nombres: e.nombres, fecha_nacimiento: e.fechaNacimiento || null,
+    vinculo: e.vinculo, a_cargo: !!e.aCargo, asignaciones_familiares: !!e.asignaciones, cobertura_obra_social: !!e.obraSocial,
+    convive: !!e.convive, discapacidad: !!e.discapacidad, cud_vencimiento: e.discapacidad ? (e.cudVencimiento || null) : null,
+    nivel_escolar: e.nivelEscolar || null,
+    certificado_escolar_anio: e.nivelEscolar && e.certificadoEscolarAnio ? parseInt(e.certificadoEscolarAnio, 10) : null,
+  }),
+};
+
 export const TABLE_MAPS = {
   empleados: mapEmpleado,
   capacitaciones: mapCapacitacion,
@@ -746,6 +788,7 @@ export const TABLE_MAPS = {
   examenes_srt: mapExamenSRT,
   legajos: mapLegajo,
   beneficiarios: mapBeneficiario,
+  grupo_familiar: mapFamiliar,
 };
 
 export const TIPOS_EXAMEN_SRT = ["Preocupacional", "Periódico", "Egreso"];
