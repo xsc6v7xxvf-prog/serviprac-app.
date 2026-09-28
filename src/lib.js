@@ -454,8 +454,34 @@ export const DOTACION_REF = [
   ["Lancha practicaje (CÓNDOR I/II)","~18m / ~30 TRB","1 Patrón de Puerto/Fluvial 2da","1 Motorista/Maquinista","1 Marinero Mercante"],
 ];
 
+export const ESTADOS_CIVILES = ["Soltero/a", "Casado/a", "Divorciado/a", "Viudo/a", "Unión de hecho"];
+export const GENEROS = ["Femenino", "Masculino", "Otro"];
+export const TIPOS_CONTRATO = ["Indefinido", "Temporal", "Por obra", "Otro"];
+export const LEGAJO_VACIO = {
+  genero: "", nacionalidad: "Argentina", lugarNacimiento: "", estadoCivil: "",
+  domicilioCalle: "", domicilioPiso: "", codigoPostal: "", ciudad: "", provincia: "", pais: "Argentina",
+  telefonoCelular: "", telefonoFijo: "", email: "", codigoEmpleado: "", area: "", tipoContrato: "",
+  emergenciaNombre: "", emergenciaParentesco: "", emergenciaTelefono: "", declaracionFecha: "", declaracionCiudad: "",
+};
+export const BENEF_VACIO = () => ({ nombre: "", dni: "", parentesco: "", fechaNacimiento: "", telefono: "", porcentaje: "" });
+export const sumaPorcentajes = (bs) => bs.reduce((a, b) => a + (parseFloat(b.porcentaje) || 0), 0);
+export const cbuValido = (v) => !v || /^\d{22}$/.test(String(v).replace(/\s/g, ""));
+export const maskCBU = (v) => (v ? `••••${String(v).slice(-4)}` : "");
+/** Avance del legajo: 6 controles que RRHH puede completar. */
+export function estadoLegajo(leg, bens) {
+  const l = leg || {};
+  const cargados = (bens || []).filter((b) => b.nombre && b.nombre.trim());
+  const checks = [
+    ["Domicilio", !!(l.domicilioCalle && l.ciudad)],
+    ["Teléfono celular", !!l.telefonoCelular],
+    ["Estado civil", !!l.estadoCivil],
+    ["Contacto de emergencia", !!(l.emergenciaNombre && l.emergenciaTelefono)],
+    ["Beneficiarios (100%)", cargados.length > 0 && Math.abs(sumaPorcentajes(cargados) - 100) < 0.001],
+    ["Declaración jurada", !!l.declaracionFecha],
+  ];
+  return { hechos: checks.filter((c) => c[1]).length, total: checks.length, faltan: checks.filter((c) => !c[1]).map((c) => c[0]) };
+}
 export const CARGOS = ["Patrón Motorista Profesional de Primera", "Patrón Motorista Profesional de Segunda", "Patrón Motorista Profesional de Tercera", "Marinero con Máximo de Cargo", "Marinero de Puente", "Marinero Especial", "Marinero", "Auxiliar de Máquinas Navales", "Maestranza-Camarero", "Práctico", "Administrativo"];
-export const CATEGORIAS = ["Categoría A", "Categoría B", "Categoría C"];
 export const CURSOS_REGINAVE = ["Formación Básica de Seguridad (FBS)", "Lucha Contra Incendio", "Técnicas de Supervivencia",
   "Operador Radio Restringido (ORR)", "Primeros Auxilios a Bordo", "Manejo Seguro de Lanchas de Practicaje", "Prevención de Contaminación (MARPOL)"];
 export const TIPOS_SANCION = ["Apercibimiento Verbal", "Apercibimiento Escrito", "Suspensión 1-3 días", "Suspensión 4-10 días", "Suspensión 11-30 días", "Baja con causa"];
@@ -587,18 +613,18 @@ const mapEmpleado = {
   fromDb: (r) => ({
     id: r.id, apellido: r.apellido, nombre: r.nombre, dni: r.dni || "", cuil: r.cuil || "",
     fNacimiento: r.f_nacimiento || "", fIngreso: r.f_ingreso || "", cargo: r.cargo || "",
-    categoriaReginave: r.categoria_reginave || "", libretaEmbarco: r.libreta_embarco || "",
+    libretaEmbarco: r.libreta_embarco || "",
     vencLibreta: r.venc_libreta || "", vencHabilitacion: r.venc_habilitacion || "",
     vencCertMedico: r.venc_cert_medico || "", lancha: r.lancha || "",
-    distritoPNA: r.distrito_pna || "", estado: r.estado || "Activo",
+    estado: r.estado || "Activo",
   }),
   toDb: (e) => ({
     apellido: e.apellido, nombre: e.nombre, dni: e.dni || null, cuil: e.cuil || null,
     f_nacimiento: e.fNacimiento || null, f_ingreso: e.fIngreso || null, cargo: e.cargo || null,
-    categoria_reginave: e.categoriaReginave || null, libreta_embarco: e.libretaEmbarco || null,
+    libreta_embarco: e.libretaEmbarco || null,
     venc_libreta: e.vencLibreta || null, venc_habilitacion: e.vencHabilitacion || null,
     venc_cert_medico: e.vencCertMedico || null, lancha: e.lancha || null,
-    distrito_pna: e.distritoPNA || null, estado: e.estado || "Activo",
+    estado: e.estado || "Activo",
   }),
 };
 const mapCapacitacion = {
@@ -622,8 +648,8 @@ const mapEvaluacion = {
   toDb: (e) => ({ empleado_id: e.empleadoId, evaluador: e.evaluador || null, fecha: e.fecha, puntaje: e.puntaje, veredicto: e.veredicto, scores: e.scores || {} }),
 };
 const mapNomina = {
-  fromDb: (r) => ({ id: r.id, empleadoId: r.empleado_id, categoriaCCT: r.categoria_cct || "", salarioBasico: r.salario_basico || "" }),
-  toDb: (e) => ({ empleado_id: e.empleadoId, categoria_cct: e.categoriaCCT || null, salario_basico: e.salarioBasico || null }),
+  fromDb: (r) => ({ id: r.id, empleadoId: r.empleado_id, categoriaCCT: r.categoria_cct || "", salarioBasico: r.salario_basico || "", cbu: r.cbu || "" }),
+  toDb: (e) => ({ empleado_id: e.empleadoId, categoria_cct: e.categoriaCCT || null, salario_basico: e.salarioBasico || null, cbu: e.cbu || null }),
 };
 const mapEmbarcacion = {
   fromDb: (r) => ({
@@ -670,6 +696,43 @@ const mapExamenSRT = {
   }),
 };
 
+const mapLegajo = {
+  fromDb: (r) => ({
+    id: r.id, empleadoId: r.empleado_id, genero: r.genero || "", nacionalidad: r.nacionalidad || "",
+    lugarNacimiento: r.lugar_nacimiento || "", estadoCivil: r.estado_civil || "",
+    domicilioCalle: r.domicilio_calle || "", domicilioPiso: r.domicilio_piso || "", codigoPostal: r.codigo_postal || "",
+    ciudad: r.ciudad || "", provincia: r.provincia || "", pais: r.pais || "",
+    telefonoCelular: r.telefono_celular || "", telefonoFijo: r.telefono_fijo || "", email: r.email || "",
+    codigoEmpleado: r.codigo_empleado || "", area: r.area || "", tipoContrato: r.tipo_contrato || "",
+    emergenciaNombre: r.emergencia_nombre || "", emergenciaParentesco: r.emergencia_parentesco || "",
+    emergenciaTelefono: r.emergencia_telefono || "",
+    declaracionFecha: r.declaracion_fecha || "", declaracionCiudad: r.declaracion_ciudad || "",
+  }),
+  toDb: (e) => ({
+    empleado_id: e.empleadoId, genero: e.genero || null, nacionalidad: e.nacionalidad || null,
+    lugar_nacimiento: e.lugarNacimiento || null, estado_civil: e.estadoCivil || null,
+    domicilio_calle: e.domicilioCalle || null, domicilio_piso: e.domicilioPiso || null, codigo_postal: e.codigoPostal || null,
+    ciudad: e.ciudad || null, provincia: e.provincia || null, pais: e.pais || null,
+    telefono_celular: e.telefonoCelular || null, telefono_fijo: e.telefonoFijo || null, email: e.email || null,
+    codigo_empleado: e.codigoEmpleado || null, area: e.area || null, tipo_contrato: e.tipoContrato || null,
+    emergencia_nombre: e.emergenciaNombre || null, emergencia_parentesco: e.emergenciaParentesco || null,
+    emergencia_telefono: e.emergenciaTelefono || null,
+    declaracion_fecha: e.declaracionFecha || null, declaracion_ciudad: e.declaracionCiudad || null,
+  }),
+};
+const mapBeneficiario = {
+  fromDb: (r) => ({
+    id: r.id, empleadoId: r.empleado_id, orden: r.orden, nombre: r.nombre || "", dni: r.dni || "",
+    parentesco: r.parentesco || "", fechaNacimiento: r.fecha_nacimiento || "", telefono: r.telefono || "",
+    porcentaje: r.porcentaje === null || r.porcentaje === undefined ? "" : String(Number(r.porcentaje)),
+  }),
+  toDb: (e) => ({
+    empleado_id: e.empleadoId, orden: e.orden, nombre: e.nombre, dni: e.dni || null,
+    parentesco: e.parentesco || null, fecha_nacimiento: e.fechaNacimiento || null, telefono: e.telefono || null,
+    porcentaje: e.porcentaje === "" || e.porcentaje === undefined ? null : Number(e.porcentaje),
+  }),
+};
+
 export const TABLE_MAPS = {
   empleados: mapEmpleado,
   capacitaciones: mapCapacitacion,
@@ -681,6 +744,8 @@ export const TABLE_MAPS = {
   embarcaciones: mapEmbarcacion,
   auditoria: mapAuditoria,
   examenes_srt: mapExamenSRT,
+  legajos: mapLegajo,
+  beneficiarios: mapBeneficiario,
 };
 
 export const TIPOS_EXAMEN_SRT = ["Preocupacional", "Periódico", "Egreso"];
@@ -709,6 +774,13 @@ export async function borrarArchivoExamen(path) {
 }
 
 /* ─────────────────────────── HOOK: tabla conectada a Supabase ─────────────────────────── */
+export function reportarError(tabla, accion, error) {
+  console.error(accion, tabla, error);
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent("serviprac-error", { detail: { tabla, accion, mensaje: (error && error.message) || String(error) } }));
+  }
+}
+
 export function useSupabaseTable(tableName) {
   const { fromDb, toDb } = TABLE_MAPS[tableName];
   const [data, setDataState] = useState([]);
@@ -748,19 +820,22 @@ export function useSupabaseTable(tableName) {
 
     for (const item of toDelete) {
       const { error } = await supabase.from(tableName).delete().eq("id", item.id);
-      if (error) console.error("delete", tableName, error);
+      if (error) reportarError(tableName, "borrar", error);
     }
     for (const item of toUpdate) {
       const { error } = await supabase.from(tableName).update(toDb(item)).eq("id", item.id);
-      if (error) console.error("update", tableName, error);
+      if (error) reportarError(tableName, "actualizar", error);
     }
+    const insertados = [];
     for (const item of toInsert) {
       const { data: inserted, error } = await supabase.from(tableName).insert(toDb(item)).select().single();
-      if (error) { console.error("insert", tableName, error); continue; }
+      if (error) { reportarError(tableName, "guardar", error); continue; }
       const real = fromDb(inserted);
+      insertados.push(real);
       setDataState((curr) => curr.map((c) => (c.id === item.id ? real : c)));
       prevRef.current = prevRef.current.map((c) => (c.id === item.id ? real : c));
     }
+    return insertados;
   }, [tableName]);
 
   return [data, setData, ready];
