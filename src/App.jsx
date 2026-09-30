@@ -248,12 +248,16 @@ function LoginScreen({ onLogin }) {
 
         <div style={{
           textAlign: "center", marginBottom: 32, background: "rgba(255,255,255,0.82)",
-          borderRadius: 12, padding: "8px 14px", backdropFilter: "blur(2px)",
+          borderRadius: 14, padding: "12px 18px", backdropFilter: "blur(2px)",
         }}>
-          <div style={{ color: C.navy, fontSize: 13, fontWeight: 700, letterSpacing: 0.2 }}>
-            Sistema de Gestión de Personal Embarcado
+          <div style={{ fontSize: 22, fontWeight: 800, letterSpacing: -0.4, lineHeight: 1.15 }}>
+            <span style={{ color: C.navy }}>SERVIPRAC</span>{" "}
+            <span style={{ color: C.gold }}>Bridge</span>
           </div>
-          <div style={{ color: C.inkSoft, fontSize: 10.5, fontWeight: 700, letterSpacing: 1.5, marginTop: 4 }}>
+          <div style={{ color: C.ink, fontSize: 13, fontWeight: 500, marginTop: 3 }}>
+            El centro de mando de la empresa.
+          </div>
+          <div style={{ color: C.inkSoft, fontSize: 10.5, fontWeight: 700, letterSpacing: 1.5, marginTop: 7 }}>
             REGINAVE · PREFECTURA NAVAL ARGENTINA
           </div>
         </div>
