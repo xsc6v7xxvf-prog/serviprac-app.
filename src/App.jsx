@@ -345,8 +345,7 @@ function LoginScreen({ onLogin }) {
         }}>
           <ShieldAlert size={14} color={C.inkSoft} style={{ flexShrink: 0, marginTop: 1 }} />
           <div style={{ fontSize: 10.5, color: C.inkSoft, lineHeight: 1.45 }}>
-            Las contraseñas nunca se guardan en el código ni en este navegador. Los usuarios se
-            administran desde Presidencia.
+            Las contraseñas nunca se guardan en el código ni en este navegador.
           </div>
         </div>
       </div>
