@@ -20,6 +20,15 @@ import {
 } from "./lib.js";
 
 
+/* Tipografía de la marca SIG (Uncial Antiqua · Google Fonts) */
+if (typeof document !== "undefined" && !document.getElementById("font-uncial-antiqua")) {
+  const l = document.createElement("link");
+  l.id = "font-uncial-antiqua";
+  l.rel = "stylesheet";
+  l.href = "https://fonts.googleapis.com/css2?family=Uncial+Antiqua&display=swap";
+  document.head.appendChild(l);
+}
+
 function Pill({ children, bg, fg, size = 12 }) {
   return (
     <span style={{
@@ -257,8 +266,9 @@ function LoginScreen({ onLogin }) {
           <div style={{ color: C.ink, fontSize: 13, fontWeight: 500, marginTop: 3 }}>
             El centro de mando de la empresa.
           </div>
-          <div style={{ color: C.inkSoft, fontSize: 10.5, fontWeight: 700, letterSpacing: 1.5, marginTop: 7 }}>
-            REGINAVE · PREFECTURA NAVAL ARGENTINA
+          <div style={{ color: C.navy, fontFamily: "'Uncial Antiqua', Georgia, 'Times New Roman', serif",
+            fontSize: 30, fontWeight: 400, letterSpacing: 6, lineHeight: 1, marginTop: 10, paddingLeft: 6 }}>
+            SIG
           </div>
         </div>
 
