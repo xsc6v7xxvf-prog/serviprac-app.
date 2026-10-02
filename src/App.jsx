@@ -25,8 +25,64 @@ if (typeof document !== "undefined" && !document.getElementById("font-uncial-ant
   const l = document.createElement("link");
   l.id = "font-uncial-antiqua";
   l.rel = "stylesheet";
-  l.href = "https://fonts.googleapis.com/css2?family=Uncial+Antiqua&display=swap";
+  l.href = "https://fonts.googleapis.com/css2?family=Uncial+Antiqua&family=Pirata+One&family=Noto+Sans+Runic&display=swap";
   document.head.appendChild(l);
+}
+if (typeof document !== "undefined" && !document.getElementById("sig-keyframes")) {
+  const s = document.createElement("style");
+  s.id = "sig-keyframes";
+  s.textContent = "@keyframes sigSheen{0%{background-position:160% 0}55%,100%{background-position:-60% 0}}";
+  document.head.appendChild(s);
+}
+
+/* Marca SIG — placa vikinga tallada en 3D con brillo e inclinación interactiva */
+function SigPlaca() {
+  const [tilt, setTilt] = useState(null);
+  const onMove = (e) => {
+    const r = e.currentTarget.getBoundingClientRect();
+    const x = (e.clientX - r.left) / r.width - 0.5, y = (e.clientY - r.top) / r.height - 0.5;
+    setTilt({ rx: -y * 22, ry: x * 26 });
+  };
+  const rivet = (pos) => (
+    <span style={{ position: "absolute", ...pos, width: 7, height: 7, borderRadius: "50%",
+      background: "radial-gradient(circle at 35% 30%,#FFF1C2,#C8960C 60%,#5A4205)", boxShadow: "0 1px 1px #000" }} />
+  );
+  const runas = (
+    <div style={{ fontFamily: "'Noto Sans Runic', serif", color: "#B8890B", fontSize: 11, letterSpacing: 5,
+      whiteSpace: "nowrap", overflow: "hidden", width: "100%", textAlign: "center",
+      textShadow: "0 -1px 0 #000, 0 1px 0 rgba(255,241,194,0.18)" }}>ᛊᛁᚷ · ᛊᛁᚷ · ᛊᛁᚷ · ᛊᛁᚷ · ᛊᛁᚷ</div>
+  );
+  return (
+    <div style={{ marginTop: 14, padding: "6px 6px 18px", perspective: 700 }}>
+      <div onMouseMove={onMove} onMouseLeave={() => setTilt(null)} style={{
+        position: "relative", overflow: "hidden", transformStyle: "preserve-3d",
+        transform: tilt ? `perspective(700px) rotateX(${tilt.rx}deg) rotateY(${tilt.ry}deg)` : "perspective(700px) rotateX(12deg)",
+        transition: "transform 0.25s ease-out",
+        background: "linear-gradient(160deg,#0B2456 0%,#001238 55%,#000A22 100%)",
+        border: "1px solid #E2B84A", borderRadius: 4, padding: "12px 14px 14px",
+        display: "flex", flexDirection: "column", alignItems: "center", gap: 6,
+        boxShadow: "inset 0 1px 0 rgba(255,241,194,0.25), inset 0 -2px 0 #000, inset 0 0 0 4px #001238, inset 0 0 0 5px rgba(200,150,12,0.55), 0 2px 0 #A47A0A, 0 4px 0 #7E5D07, 0 6px 0 #5A4205, 0 8px 0 #3A2A03, 0 18px 26px rgba(0,10,30,0.5)",
+      }}>
+        {rivet({ left: 7, top: 7 })}{rivet({ right: 7, top: 7 })}{rivet({ left: 7, bottom: 7 })}{rivet({ right: 7, bottom: 7 })}
+        {runas}
+        <div style={{
+          fontFamily: "'Pirata One', Georgia, serif", fontSize: 70, letterSpacing: 8, lineHeight: 0.95, paddingLeft: 8,
+          background: "linear-gradient(180deg,#FFF6D6 0%,#F3D68A 28%,#C8960C 52%,#8A6608 74%,#E2B84A 100%)",
+          WebkitBackgroundClip: "text", backgroundClip: "text", color: "transparent",
+          filter: "drop-shadow(0 1px 0 #6E5206) drop-shadow(0 2px 0 #4F3B04) drop-shadow(0 3px 0 #2E2202) drop-shadow(0 6px 5px rgba(0,0,0,0.7))",
+        }}>SIG</div>
+        <div style={{ fontSize: 10, fontWeight: 700, color: C.celeste, letterSpacing: 2.8, textTransform: "uppercase", textShadow: "0 1px 0 #000" }}>
+          Sistema Integral de Gestión
+        </div>
+        {runas}
+        <span aria-hidden="true" style={{
+          position: "absolute", inset: 0, pointerEvents: "none", mixBlendMode: "screen",
+          background: "linear-gradient(105deg, transparent 38%, rgba(255,241,194,0.45) 50%, transparent 62%)",
+          backgroundSize: "250% 100%", animation: "sigSheen 4s ease-in-out infinite",
+        }} />
+      </div>
+    </div>
+  );
 }
 
 function Pill({ children, bg, fg, size = 12 }) {
@@ -266,10 +322,7 @@ function LoginScreen({ onLogin }) {
           <div style={{ color: C.ink, fontSize: 13, fontWeight: 500, marginTop: 3 }}>
             El centro de mando de la empresa.
           </div>
-          <div style={{ color: C.navy, fontFamily: "'Uncial Antiqua', Georgia, 'Times New Roman', serif",
-            fontSize: 30, fontWeight: 400, letterSpacing: 6, lineHeight: 1, marginTop: 10, paddingLeft: 6 }}>
-            SIG
-          </div>
+          <SigPlaca />
         </div>
 
         {/* Tarjeta de acceso */}
